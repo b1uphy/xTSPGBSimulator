@@ -5,6 +5,10 @@
 # BEGIN xTSPSimulator_TOP
 import sys
 import asyncio
+import functools
+from  async_timeout import timeout
+
+TIMER_OTA_MSG_TIMEOUT = 3
 
 CRLF = b'\r\n'
 PROMPT = b'?> '
@@ -12,6 +16,7 @@ PROMPT = b'?> '
 async def handle_queries(reader, writer):  # <3>
     client = writer.get_extra_info('peername')
     print('Client {} connected.'.format(client))
+    counter = 0
     while True:  # <4>
         try:
             header = await reader.readexactly(24)  # <7>
@@ -24,9 +29,22 @@ async def handle_queries(reader, writer):  # <3>
             print('lengthraw:{}'.format(lengthraw))
             length = int.from_bytes(lengthraw, byteorder='big')+1
             print('length:{}'.format(length))
-            data = await reader.readexactly(length)
+
+            data = None
+            try:
+                async with timeout(TIMER_OTA_MSG_TIMEOUT):
+                    data = await reader.readexactly(length)
+            except asyncio.TimeoutError:
+                print('Rx timeout')
+                print('Close connection because of timeout')
+            
+
+            counter += 1
+            print('counter=',counter)
+            
             if data:
                 print('Received from {0}:\t{1}'.format(client,data))  # <10>
+            
         else:
             break
     print('Close the client socket')  # <17>
@@ -44,7 +62,7 @@ def main(address='127.0.0.1', port=9201):  # <1>
     print('Serving on {}. Hit CTRL-C to stop.'.format(host))  # <5>
     try:
         loop.run_forever()  # <6>
-        print('here')
+        print('Can not be here')
     except KeyboardInterrupt:  # CTRL+C pressed
         pass
 
