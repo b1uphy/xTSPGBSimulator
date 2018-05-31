@@ -9,6 +9,7 @@ import functools
 from  async_timeout import timeout
 from xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime
 TIMER_OTA_MSG_TIMEOUT = 30
+LISTEMING_PORT = 9201
 
 gInterrupt_flagstr = ''
 # BEGIN APP Layer
@@ -52,12 +53,18 @@ class Vehicle:
 
     def responseLogin(self):
         result = {'msg':None, 'responsecode':0}
-        result['msg'] = createOTAGBMsg(CMD.inv['车辆登入'], b'\xFE', self.VIN, 1, 7, genGBTime())
+        result['msg'] = createOTAGBMsg(CMD.inv['车辆登入'], b'\x01', self.VIN, 1, 30, genGBTime()+self.data.payload[6:])
         print("response result['msg']",result['msg'])
         return result
 
     def responseLogout(self):
         result = {'msg':None, 'responsecode':'Close Connection'}
+        result['msg'] = createOTAGBMsg(CMD.inv['车辆登出'], b'\x01', self.VIN, 1, 8, genGBTime()+self.data.payload[6:])
+        return result
+
+    def responseHeartbeat(self):
+        result = {'msg':None, 'responsecode':0}
+        result['msg'] = createOTAGBMsg(CMD.inv['心跳'], b'\x01', self.VIN, 1, 0, b'')
         return result
 
     def writedb(self, VIN:str, systime, msgtime, direction,msg:bytes, db):
@@ -82,11 +89,11 @@ async def receiveMsg(client,reader)->bytes:
         result['responsecode'] = 'Connection broken'
 
     if header:
-        print('Received header {0}:\t{1}'.format(client,header.hex()))
+        #print('Received header {0}:\t{1}'.format(client,header.hex()))
         lengthraw = header[-2:]
-        print('lengthraw:{}'.format(lengthraw))
+        #print('lengthraw:{}'.format(lengthraw))
         length = int.from_bytes(lengthraw, byteorder='big')+1 # the length including the sum byte
-        print('length:{}'.format(length))
+        #print('length:{}'.format(length))
 
         data = None
         try:
@@ -140,7 +147,7 @@ async def handle_vehicle_connection(reader, writer):  # <3>
 # END xTSPSimulator_TOP
 
 # BEGIN xTSPSimulator_MAIN
-def main(address='127.0.0.1', port=9201):  # <1>
+def main(address='127.0.0.1', port=LISTEMING_PORT):  # <1>
     port = int(port)
     loop = asyncio.get_event_loop()
     server_coro = asyncio.start_server(handle_vehicle_connection, address, port, loop=loop) # <2>

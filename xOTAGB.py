@@ -15,14 +15,14 @@ CMD = bidict({
     })
 class Field:
     def __init__(self,name,raw,convertfunc=None,checkfunc=None):
-        print(raw)
+        #print(raw)
         self.name = name
 
         if type(raw) is int:
             self.raw = raw.to_bytes(1,byteorder='big')
         else:
             self.raw = raw
-        print(type(self.raw))
+        #print(type(self.raw))
         if convertfunc:          
             self.phy = convertfunc(self.raw)
         else:
@@ -30,7 +30,7 @@ class Field:
 
 class Head:
     def __init__(self, header:bytes):
-        print(header[2])
+        #print(header[2])
         self.cmd = Field('命令标识', header[2], convertfunc=lambda x: CMD[x])
         self.resflg = Field('应答标志', header[3])
         self.VIN = Field('VIN', header[4:21],convertfunc=lambda x: x.decode('ascii'))
@@ -67,7 +67,16 @@ def genGBTime()->bytes:
     '''
     生成国标格式的时间字节流
     '''
-    return b'123456'
+    lct = time.localtime()
+    year = (lct.tm_year-2000).to_bytes(1,byteorder='big')
+    month = lct.tm_mon.to_bytes(1,byteorder='big')
+    date = lct.tm_mday.to_bytes(1,byteorder='big')
+    hour = lct.tm_hour.to_bytes(1,byteorder='big')
+    minute = lct.tm_min.to_bytes(1,byteorder='big')
+    sec = lct.tm_sec.to_bytes(1,byteorder='big')
+    gbtime = year+month+date+hour+minute+sec
+
+    return gbtime
 
 def createOTAGBMsg(cmd:bytes, resp:bytes, VIN:bytes, secrettype:int, length:int, data:bytes):
     start = b'##'
@@ -88,5 +97,6 @@ if __name__ == '__main__':
     chk = calBCCChk(tmp)
   
     print('chk=',chk.hex())
-
-    print(createOTAGBMsg(b'\x01', b'\xFE', 'LXVJ2GFC2GA030003', 1, 7, genGBTime() ))
+    print('gbtime=',genGBTime().hex())
+    print(createOTAGBMsg(b'\x01', b'\xFE', b'LXVJ2GFC2GA030003', 1, 7, genGBTime() ))
+    print(createOTAGBMsg(CMD.inv['心跳'], b'\x01', b'LXVJ2GFC2GA030003', 1, 0, b''))
