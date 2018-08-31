@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+# -*- coding: utf8 -*-
 # bluphy@163.com
 # 2018-5-29 17:06:51 by xw: new created.
 import time
 from bidict import bidict
+
 CMD = bidict({
     b'\x01' : '车辆登入',    
     b'\x02' : '实时数据',    
@@ -79,6 +81,8 @@ def genGBTime()->bytes:
     return gbtime
 
 def createOTAGBMsg(cmd:bytes, resp:bytes, VIN:bytes, secrettype:int, length:int, data:bytes):
+    '''
+    '''
     start = b'##'
     payload = cmd+resp+VIN+secrettype.to_bytes(1,byteorder='big')+length.to_bytes(2,byteorder='big')+data
     chk = calBCCChk(payload)
