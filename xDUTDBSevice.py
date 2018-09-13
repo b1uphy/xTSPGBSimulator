@@ -37,7 +37,7 @@ options = OPTIONS
 
 jira = JIRA(options,basic_auth=auth)
 
-def generateTUKEY(imei:str):
+def generateTUKEY(imei:str)->str:
     '''
     To Be Update
     '''
@@ -62,6 +62,21 @@ def getDUTInfo(imei:str)->dict:
     print('getDUTInfo: imei=',imei)
     result = {}
     for issue in jira.search_issues("project=TDM AND IMEI~{0}".format(imei), maxResults=1):
+        # print(dir(issue.fields))
+        for field in CUSTOMFIELDMAP.keys():
+            try:
+                result[field] = getattr(issue.fields,CUSTOMFIELDMAP[field])
+            except:
+                result[field] = None
+    return result
+
+def getDUTInfoByVIN(vin:str)->dict:
+    '''
+    通过DUT的VIN值获取DUT相关信息,相关字段参考 CUSTOMFIELDMAP 定义的键
+    '''
+    print('getDUTInfoByVIN: vin=',vin)
+    result = {}
+    for issue in jira.search_issues("project=TDM AND VIN~{0}".format(vin), maxResults=1):
         # print(dir(issue.fields))
         for field in CUSTOMFIELDMAP.keys():
             try:

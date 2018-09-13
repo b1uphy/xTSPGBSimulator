@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-09-07 19:42:24 by xw: fix bug when vin contains null character
 # 2018-7-20 11:50:55 by xw: new created.
 
 
@@ -16,7 +17,12 @@ def parseGBPkgs_bytes(raw:bytes):
     dct['head'] = raw[:2]
     dct['cmd'] = raw[2:3]
     dct['ack'] = raw[3:4]
-    dct['VIN'] = raw[4:21].decode('ascii')
+    try:
+        dct['VIN'] = raw[4:21].decode('ascii')
+    except:
+        dct['VIN'] = '0'*17
+    finally:
+        if '\x00' in dct['VIN']: dct['VIN'] = '0'*17
     dct['encrypt'] = raw[21:22]
     dct['length'] = int.from_bytes(raw[22:24], byteorder='big')
     dct['msgtime'] = raw[24:30]
@@ -50,9 +56,10 @@ def writedb(raw:bytes, systime, direction, dbhdl):
     msglen = dct['length'] 
     errorcode = checkmsg(raw) 
     # raw = raw
-    cur.execute("INSERT INTO gbt32960 (vin, msgtime, systime, cmd, \
-    direction, encryption, errorcode, msglen, rawmsg, checkbyte) \
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",\
+    cur.execute('''INSERT INTO gbt32960 (vin, msgtime, systime, cmd, 
+    direction, encryption, errorcode, msglen, rawmsg, checkbyte) 
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+    ''',\
     (vin, msgtime, systime, cmd, direction, encryption, errorcode, msglen, raw, check))
     conn.commit()
 
