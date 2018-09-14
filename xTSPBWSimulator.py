@@ -103,23 +103,14 @@ async def handle_vehicle_connection(reader:asyncio.StreamReader, writer:asyncio.
     vhl = ota.VehicleAgent(vhlinterface)
     vhl.initVhlInterface(reader,writer)
 
-    while True:  # <4>        
-        print('Waiting msg from {0}...'.format(vhlclient))
-        await asyncio.gather(vhl.processVhlMsg(),vhl.txMsg2Vhl(),vhl.processAdvisorMsg(),vhl.txMsg2Advisor())
+      
+    print('Waiting msg from {0}...'.format(vhlclient))
+    # await asyncio.gather(vhl.processVhlMsg(),vhl.txMsg2Vhl(),vhl.processAdvisorMsg(),vhl.txMsg2Advisor())
+    await asyncio.gather(vhl.processVhlMsg(),vhl.txMsg2Vhl())
 
-
-    print('Close the client socket')  # <17>
-    writer.close()  # <18>
+    print('Client destroied')  # <17>
+    # writer.close()  # <18>
 # END xTSPSimulator_TOP
-
-# async def startTSP(loop,address2vhl='127.0.0.1', port2vhl=LISTENING_VHL_PORT, address2cc='127.0.0.1', port2cc=LISTENING_CC_PORT):
-#     port2vhl = int(port2vhl)
-#     port2cc = int(port2cc)  
-
-#     #server_coro is a corotine object, asyncio.start_server is a corotine function
-#     server2vhl_coro = await asyncio.start_server(handle_vehicle_connection, address2vhl, port2vhl, loop=loop) # <2>
-#     server2cc_coro = await asyncio.start_server(handle_cc_connection, address2cc, port2cc, loop=loop)
-#     return {'vhlServer':server2vhl_coro,'ccServer':server2cc_coro}
 
 
 #### BEGIN xTSPSimulator_MAIN

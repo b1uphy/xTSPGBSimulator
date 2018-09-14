@@ -5,6 +5,7 @@
 # 2018-5-29 17:06:51 by xw: new created.
 
 #### BEGIN Calibration
+
 #B-LINK default tukey
 TUKEY = bytes.fromhex('5A3756216A2649754E512576572B4733')
 #### ##END Calibration
@@ -17,7 +18,11 @@ OTABW_SUFFIX = b'\xb2\x5e\x38\xa2'
 # OTABW_PREFIX = '5F8ABBCD'.encode('ascii')
 # OTABW_SUFFIX = 'B25E38A2'.encode('ascii')
 MSG_CONFIG = 'OTAMSG_config.json'
-TIMER_OTA_MSG_TIMEOUT = 5
+TIMER_OTA_MSG_TIMEOUT_RX = 5
+TIMER_OTA_MSG_TIMEOUT_TX = 2
+TIMER_OTA_MSG_TIMEOUT_HEARTBEAT = 60
+COUNTER_OTA_MSG_MAXRETRY = 3
+
 #### ##END Constants
 
 import time,asyncio
@@ -26,8 +31,9 @@ from Crypto.Cipher import AES
 from bidict import bidict
 import json
 from async_timeout import timeout
-from xDUTDBSevice import getDUTInfo,getDUTInfoByVIN,generateTUKEY,setDUTInfo
-
+# from xDUTDBSevice import getDUTInfo,getDUTInfoByVIN,generateTUKEY,setDUTInfo
+from xDUTDBSeviceFake import getDUTInfo,getDUTInfoByVIN,generateTUKEY,setDUTInfo
+from queue import Queue
 # 全局字典，保存登入车辆的实例句柄
 gDictVhlCc = {}
 
@@ -175,17 +181,21 @@ class BWMsgCore:
         self.subfunc = subfunc
         self.body = body
 
+    def __repr__(self):
+        return '<sid={0},subfunc={1},body={2}>'.format(self.sid.hex(),self.subfunc.hex(),self.body.hex())
+
+
     def generateOTAMsg(self,vhl):
         result = {}
-        equipment_id = vhl.info.VIN
+        equipment_id = vhl.info['VIN']
         event_id = vhl.eventID
         vhl.downlink += 1
         downlink = vhl.downlink
         uplink = 0
-        datalen = calDataLength(len(body))    
+        datalen = calDataLength(len(self.body))    
         header = createOTABWHeader(vhl.imei)
         dispatcher = createOTABWDispatcher(equipment_id,event_id,self.sid,self.subfunc,uplink,downlink,datalen)
-        result['value'] = createOTA(header,dispatcher,body)
+        result['value'] = createOTA(header,dispatcher,self.body)
         result['code'] = 0
         return result
 
@@ -250,7 +260,6 @@ class BWBody:
         return True
 
 
-
 # BEGIN APP Layer/
 class VehicleAgent:
     def __init__(self,interface,firstmsg:bytes=None,**config):
@@ -297,7 +306,7 @@ class VehicleAgent:
         return BWMsgCore
         '''
         result = {}
-        print('dissect msg:',msg.hex())
+        # print('dissect msg:',msg.hex())
         #Step 1: Analysis msg.
         header = BWHeader(msg[:18])
         if not self.imei:
@@ -305,6 +314,9 @@ class VehicleAgent:
             self.imei = header.IMEI.phy
             print('imei=',self.imei)
             self.info = getDUTInfo(self.imei)
+        else:
+            self.state = 'connected'
+
         decrypted = decryptBWOTA(self.info['TUKEY'],msg[18:])
         rxraw = header.raw+decrypted
         print('IMEI {0} :\n \tRx Uncrypted: {1}'.format(self.imei,rxraw.hex()))
@@ -335,6 +347,7 @@ class VehicleAgent:
         0: positive response
         >0: same as the OTA NRC code definition
         '''
+        print('parseMsgCore: enter')
         result = {}
         # sid = msgcore.sid
         sid = b'\x1d'
@@ -342,7 +355,9 @@ class VehicleAgent:
         subfunc = b'\x00'
         body = b''
         result['value'] = BWMsgCore(sid,subfunc,body)
-        result['code'] = 0 
+        result['code'] = 0
+        print('rseponse msgcore:',result['value'])
+        print('parseMsgCore: return')
         return result
 
     async def processVhlMsg(self):
@@ -350,76 +365,94 @@ class VehicleAgent:
         
         '''
         while True:
+            print('processVhlMsg: enter')
             print('#Step 0: wait msg')
             result = await self.rxMsgFromVhl()
-            print('#Step 1: dissect msg')
-            msgcore = self.dissectMsg(result['value'])
-            
-            print('#Step 2: generate the tx msgcore')
-            response = self.parseMsgCore(msgcore)
+            if result['code']>=0:
+                print('#Step 1: dissect msg')
+                msgcore = self.dissectMsg(result['value'])
+                
+                print('#Step 2: generate the tx msgcore')
+                response = self.parseMsgCore(msgcore)
 
-            print('#Step 3: put the msg into tx queue')
-            self.outMsgs2VhlQueue.put(response)
+                print('#Step 3: put the msg {0} into tx queue'.format(response['value']))
+                await self.outMsgs2VhlQueue.put(response['value'])
+            else:
+                self.writerVhl.close()
+                self.state = 'disconnected'
+                print('socket disconnected')
+                break
+        print('processVhlMsg: return')
+        return result['code']
 
     async def rxMsgFromVhl(self):
         '''
         put the raw msg bytes without the OTABW_PREFIX and OTABW_SUFFIX
         '''
-        result = {'value':None, 'code':0}
+        result = {'value':None, 'code':-1}
         OTAprefix = None
         try:
             rxtime = time.strftime('%Y%m%d %H:%M:%S')
-            async with timeout(TIMER_OTA_MSG_TIMEOUT):
-                OTAprefix = await self.readerVhl.readexactly(len(OTABW_PREFIX.hex().encode('ascii')))
+            async with timeout(TIMER_OTA_MSG_TIMEOUT_RX):
+                OTAprefix = await self.readerVhl.readexactly(len(OTABW_PREFIX.hex()))
                 
         except asyncio.TimeoutError:
             print('Rx timeout')
-            print('Close connection because of timeout')
-            result['code'] = 'Timeout!'    
+            print('Close connection with {0} because of timeout1'.format(self.imei))
+            result['code'] = -1    
         except ConnectionError:
-            print('Connection broken!')
-            result['code'] = 'Connection broken'
+            print('Connection broken with {0} !'.format(self.imei))
+            result['code'] = -2
 
-        if OTAprefix and OTAprefix.decode('ascii') == OTABW_PREFIX.hex():
-            #print('Received header {0}:\t{1}'.format(client,header.hex()))
-            # lengthraw = header[-2:]
-            #print('lengthraw:{}'.format(lengthraw))
-            # length = int.from_bytes(lengthraw, byteorder='big')+1 # the length including the sum byte
-            #print('length:{}'.format(length))
-
-            raw = None
-            try:
-                async with timeout(TIMER_OTA_MSG_TIMEOUT):
-                    raw = await self.readerVhl.readuntil(OTABW_SUFFIX.hex().encode('ascii'))
-                systime = time.time()
+        if OTAprefix:
+            print('OTAprefix:',OTAprefix)
+            if OTAprefix.decode('ascii') == OTABW_PREFIX.hex():
+                raw = None
+                try:
+                    async with timeout(TIMER_OTA_MSG_TIMEOUT_RX):
+                        raw = await self.readerVhl.readuntil(OTABW_SUFFIX.hex().encode('ascii'))
+                    systime = time.time()
+                    
+                except asyncio.TimeoutError:
+                    print('Rx timeout')
+                    print('Close connection with {0} because of timeout2'.format(self.imei))
+                    result['code'] = -1           
                 
-            except asyncio.TimeoutError:
-                print('Rx timeout')
-                print('Close connection because of timeout')
-                result['code'] = 'Timeout!'           
-            
-            if raw:
-                result['value'] = bytes.fromhex(raw.decode('ascii'))[:-len(OTABW_SUFFIX)]
-
-                # if not self.imei:
-                #     self.imei =  result['value'][3:18].decode('ascii')
-            # writedb(result['msg'],systime,0,gDBhdl)
-                print('{0} Received from {1}:\t{2}'.format(rxtime,self.imei,result['value'].hex()))
+                if raw:
+                    result['value'] = bytes.fromhex(raw.decode('ascii'))[:-len(OTABW_SUFFIX)]
+                    result['code'] = 0
+                    # if not self.imei:
+                    #     self.imei =  result['value'][3:18].decode('ascii')
+                # writedb(result['msg'],systime,0,gDBhdl)
+                    # print('{0} Received from {1}:\t{2}'.format(rxtime,self.imei,result['value'].hex()))
 
         return result
 
     async def txMsg2Vhl(self):
         while True:
-            msgcore = await self.outMsgs2VhlQueue.get()
-            msg = msgcore.generateOTAMsg(self)
+            print('txMsg2Vhl: enter')
+
+            if self.state == 'disconnected': break
+
             try:
-                self.writerVhl.write(msg)
-                systime = time.time()
-            except ConnectionError:
-                print('Send Msg fail. Msg:',msg.hex())
+                async with timeout(15):
+                    msgcore = await self.outMsgs2VhlQueue.get()
+            except asyncio.TimeoutError:
+                print('txMsg2Vhl: nothing to send...')
             else:
-                # writedb(msg,systime,1,gDBhdl)
-                print('Send Msg:',msg.hex())
+                msg = msgcore.generateOTAMsg(self)['value'].hex().encode('ascii')
+                print('Sending msg to {0}:\n\t{1}'.format(self.imei,msg))
+                try:
+                    self.writerVhl.write(msg)
+                    systime = time.time()
+                except ConnectionError:
+                    print('Send Msg fail. Msg:',msg.hex())
+                    break
+                else:
+                    # writedb(msg,systime,1,gDBhdl)
+                    print('Send Msg:',msg.hex())
+
+        print('txMsg2Vhl: return')
 
     async def processAdvisorMsg(self):
         pass
@@ -429,16 +462,25 @@ class VehicleAgent:
 
     async def txMsg2Advisor(self):
         while True:
-            msg = await self.outMsgs2AdvisorQueue.get()
+            print('txMsg2Advisor: enter')
+            if self.state == 'disconnected': break
+            
             try:
-                self.writerAdvisor.write(msg)
-                systime = time.time()
-            except ConnectionError:
-                print('Send Msg fail. Msg:',msg.hex())
+                async with timeout(TIMER_OTA_MSG_TIMEOUT_TX):
+                    msg = await self.outMsgs2AdvisorQueue.get()
+            except asyncio.TimeoutError:
+                pass
             else:
-                # writedb(msg,systime,1,gDBhdl)
-                print('Send Msg:',msg.hex())
-
+                try:
+                    self.writerAdvisor.write(msg)
+                    systime = time.time()
+                except ConnectionError:
+                    print('Send Msg fail. Msg:',msg.hex())
+                    break
+                else:
+                    # writedb(msg,systime,1,gDBhdl)
+                    print('Send Msg:',msg.hex())
+        print('txMsg2Advisor: return')
 
 class AdvisorAgent:
     def __init__(self,client,**config):

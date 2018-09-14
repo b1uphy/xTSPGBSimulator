@@ -38,6 +38,13 @@ NRC = {
     b'\x58':'RSKeyBoundFault', 
 }
 
+xNRC = {
+     0 : 'Success',
+    -1 : 'Timeout',
+    -2 : 'Connection Broken',
+    
+}
+
 #### BEGIN Module test
 if __name__ == '__main__':
     pass
