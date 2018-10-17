@@ -5,7 +5,7 @@
 # 2018-05-24 16:52 by xw: new created.
 
 #### BEGIN Calibration
-DBHOST = '192.168.1.69'
+DBHOST = '10.40.162.31'
 DBPORT = 5432
 DBNAME = 'bw_GBPrivate_db'
 DBUSERNAME = 'bw_tester_admin'
@@ -20,29 +20,31 @@ xDEBUG = True
 
 # BEGIN xTSPSimulator_TOP
 import sys
+sys.path.append(sys.path[0].rsplit('\\',1)[0])
+
 import asyncio
 import functools
 import time
 # from xDBService import writedb,connectdb
 from async_timeout import timeout
-import xOTABW as ota
+import xOTABW.xOTABW as ota
 import threading
 
 
 
 gInterrupt_flagstr = ''
 gDBhdl = None
-gVhlhdl = {}
 
-#### BEGIN CallCenter Service
-async def receiveMsgFromCC(client,reader)->bytes:
+
+#### BEGIN Advisor Service
+async def receiveMsgFromAdvisor(client,reader)->bytes:
     result = {'msg':None, 'responsecode':0}
     msg = await reader.readline()
     if len(msg) > 5:
         result['msg'] = msg
     return result
 
-async def sendMsg2CC(writer,msg:bytes):
+async def sendMsg2Advisor(writer,msg:bytes):
     try:
         writer.write(msg)
         systime = time.time()
@@ -52,41 +54,24 @@ async def sendMsg2CC(writer,msg:bytes):
         # writedb(msg,systime,1,gDBhdl)
         print('Send Msg:',msg.hex())
 
-#### END## CallCenter Service
+#### END## Advisor Service
 
 #### BEGIN Vehicle Service
 
 #### END Vehicle Service
 
-async def handle_cc_connection(reader:asyncio.StreamReader, writer:asyncio.StreamWriter):
-    client = writer.get_extra_info('peername')
-    print('Get connected from call center')
-    print('Client {} connected.'.format(client))
-    
-    # vhl = ota.Vehicle(client)
-    while True:  # <4>
-        
-        print(client,' Waiting msg...')
+async def handle_advisor_connection(reader:asyncio.StreamReader, writer:asyncio.StreamWriter):
+    advisorclient = writer.get_extra_info('peername')
+    advisorcinterface = writer.get_extra_info('sockname')
+    print('Client {} connected.'.format(advisorclient))
+    advisor = ota.AdvisorAgent(advisorcinterface)
+    advisor.initAdvisorInterface(reader,writer)
 
-        #处理接收消息
-        result = await receiveMsgFromCC(client,reader)
-        if result['responsecode'] == 0:
-            msg = result['msg']
-        else:
-            break
-        if msg: print(msg)
-        #处理响应消息
-        # result = vhl.processMsg(msg)
+    print('Waiting msg from {0}...'.format(advisorclient))
+    # await asyncio.gather(vhl.processVhlMsg(),vhl.txMsg2Vhl(),vhl.processAdvisorMsg(),vhl.txMsg2Advisor())
+    await asyncio.gather(advisor.processAdvisorMsg(),advisor.txMsg2Advisor())
 
-        #发送响应消息        
-        responseMsg = result['msg']
-        if responseMsg:
-            await sendMsg2CC(writer,responseMsg)
-        if result['responsecode'] == 'Close':
-            break
-
-    print('Close the client socket')  # <17>
-    writer.close()  # <18>
+    print('Client destroied') 
 
 async def handle_vehicle_connection(reader:asyncio.StreamReader, writer:asyncio.StreamWriter):  # <3>
     '''
@@ -114,16 +99,16 @@ async def handle_vehicle_connection(reader:asyncio.StreamReader, writer:asyncio.
 
 
 #### BEGIN xTSPSimulator_MAIN
-def main(address2vhl='127.0.0.1', port2vhl=ota.LISTENING_VHL_PORT, address2cc='127.0.0.1', port2cc=ota.LISTENING_CC_PORT):  # <1>
+def main(address2vhl='127.0.0.1', port2vhl=ota.LISTENING_VHL_PORT, address2advisor='127.0.0.1', port2advisor=ota.LISTENING_CC_PORT):  # <1>
     # global gDBhdl
     # gDBhdl = connectdb(DBNAME,DBUSERNAME,DBPASSWORD,DBHOST,DBPORT)
 
     loop = asyncio.get_event_loop()
 
     server2vhl_coro = asyncio.start_server(handle_vehicle_connection, address2vhl, port2vhl, loop=loop) # <2>
-    server2cc_coro = asyncio.start_server(handle_cc_connection, address2cc, port2cc, loop=loop)
+    server2cc_coro = asyncio.start_server(handle_advisor_connection, address2advisor, port2advisor, loop=loop)
     print('Vehicle interface serving on {0} : {1}'.format(address2vhl,port2vhl))
-    print('Call Center interface serving on {0} : {1}'.format(address2cc,port2cc))
+    print('Call Center interface serving on {0} : {1}'.format(address2advisor,port2advisor))
     # tasks = [asyncio.ensure_future(server2vhl_coro),asyncio.ensure_future(server2cc_coro)]
     task = loop.create_task(asyncio.gather(server2cc_coro,server2vhl_coro))
 

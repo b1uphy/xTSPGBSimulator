@@ -35,13 +35,8 @@ password = PASSWORD
 auth = (username, password)
 options = OPTIONS
 
-# jira = JIRA(options,basic_auth=auth)
+jira = JIRA(options,basic_auth=auth)
 
-gVhlinfo = {
-    'imei':'867808022358814',
-    'VIN': '12345678901234567',
-    'TUKEY' : '5A3756216A2649754E512576572B4733'
-}
 
 def generateTUKEY(imei:str)->str:
     '''
@@ -65,17 +60,28 @@ def getDUTInfo(imei:str)->dict:
     '''
     通过DUT的IMEI值获取DUT相关信息,相关字段参考 CUSTOMFIELDMAP 定义的键
     '''
-    global gVhlinfo
-    # print('getDUTInfo: imei=',imei)
-    # result = {}
-    # for issue in jira.search_issues("project=TDM AND IMEI~{0}".format(imei), maxResults=1):
-    #     # print(dir(issue.fields))
-    #     for field in CUSTOMFIELDMAP.keys():
-    #         try:
-    #             result[field] = getattr(issue.fields,CUSTOMFIELDMAP[field])
-    #         except:
-    #             result[field] = None
-    return gVhlinfo
+    print('getDUTInfo: imei=',imei)
+    result = {}
+    for issue in jira.search_issues("project=TDM AND IMEI~{0}".format(imei), maxResults=1):
+        # print(dir(issue.fields))
+        for field in CUSTOMFIELDMAP.keys():
+            try:
+                result[field] = getattr(issue.fields,CUSTOMFIELDMAP[field])
+            except:
+                result[field] = None
+    return result
+
+def getVhlList(part_of_vin:str):
+    '''
+    通过DUT的VIN值获取DUT相关信息,相关字段参考 CUSTOMFIELDMAP 定义的键
+    '''
+    print('getVhlList: part_of_vin=',part_of_vin)
+    result = []
+    for issue in jira.search_issues("project=TDM AND VIN~{0}".format(part_of_vin), maxResults=100):
+        # print(dir(issue.fields))
+        result.append(getattr(issue.fields,CUSTOMFIELDMAP['VIN']))
+
+    return result
 
 def getDUTInfoByVIN(vin:str)->dict:
     '''

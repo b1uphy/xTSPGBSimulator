@@ -21,90 +21,23 @@ xDEBUG = True
 
 # BEGIN xTSPSimulator_TOP
 import sys
+sys.path.append(sys.path[0].rsplit('\\',1)[0])
+sys.path.append('D:\\bluphy\\nutcloud\\xProject\\LogParser')
+
 import asyncio
 import functools
 import time
 import json
-from xDBService import writedb,connectdb
 from async_timeout import timeout
-from xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime
 
+from xDBService.xDBService import writedb,connectdb
 
-gInterrupt_flagstr = ''
-gDBhdl = None
-# BEGIN APP Layer/
-class Vehicle:
-    def __init__(self,client):
-        self.client = client
-        self.VIN = None
-        self.state = 'connected'
-        self.data = None
-        self.msg = None
+from xGBT32960ServerCore import *
+from GB_PARSER_HANDLER import parseGBPkgs
 
-    def processMsg(self,msg)->bytes:
-        result = {'msg':None, 'responsecode':0}
-        self.data = OTAGBData(msg)
-        if self.VIN:
-            if self.VIN != self.data.head.VIN.raw:
-                self.VIN = self.data.head.VIN.raw
-                print('VIN is not match')
-        else:
-            self.VIN = self.data.head.VIN.raw
-
-        if self.data.head.cmd.phy == '车辆登入':
-            self.state = 'Login'
-            print('Vehicle login: VIN = ',self.VIN.decode('ascii'))
-            result = self.responseLogin()
-
-        elif self.data.head.cmd.phy == '实时数据' or self.data.head.cmd.phy == '补发数据':
-            chargingState_raw = self.data.payload[8]
-            if chargingState_raw==1:
-                chargingState = 1
-            else:
-                chargingState = 0
-            SOC =self.data.payload[5]
-            print('SOC=',SOC)
-            print('Vehicle {0} chargingState={1}'.format(self.VIN,chargingState))
-            with open('C:\\BDdemo\\demo.json','w') as fout:
-                fout.write(json.dumps({'chargingState':chargingState,'SOC':SOC}))
-
-            pass
-
-        elif self.data.head.cmd.phy == '车辆登出':
-            print('Vehicle logout: VIN = ',self.VIN.decode('ascii'))
-            result = self.responseLogout()
-
-        elif self.data.head.cmd.phy == '心跳':
-            result = self.responseHeartbeat()
-        else:
-            print('Error CMD')
-            result['responsecode'] = 'Error CMD'
-        
-        return result
-
-    def responseLogin(self):
-        result = {'msg':None, 'responsecode':0}
-        result['msg'] = createOTAGBMsg(CMD.inv['车辆登入'], b'\x01', self.VIN, 1, 30, genGBTime()+self.data.payload[6:])
-        print("response result['msg']",result['msg'])
-        return result
-
-    def responseLogout(self):
-        result = {'msg':None, 'responsecode':'Close'}
-        result['msg'] = createOTAGBMsg(CMD.inv['车辆登出'], b'\x01', self.VIN, 1, 8, genGBTime()+self.data.payload[6:])
-        return result
-
-    def responseHeartbeat(self):
-        result = {'msg':None, 'responsecode':0}
-        result['msg'] = createOTAGBMsg(CMD.inv['心跳'], b'\x01', self.VIN, 1, 0, b'')
-        return result
-
-
-
-
-# END APP layer
 
 # BEGIN GBOTA Layer
-async def receiveMsg(client,reader)->bytes:
+async def receiveMsg(vhl,reader)->bytes:
     result = {'msg':None, 'responsecode':0}
     header = None
     try:
@@ -133,14 +66,15 @@ async def receiveMsg(client,reader)->bytes:
                 data = await reader.readexactly(length)
             systime = time.time()
         except asyncio.TimeoutError:
+            
             print('Rx timeout')
             print('Close connection because of timeout')
             result['responsecode'] = 'Timeout!'
         
         if data:
-            result['msg'] = header+data
-            writedb(result['msg'],systime,0,gDBhdl)
-            print('{0} Received from {1}:\t{2}'.format(rxtime,client,result['msg'].hex()))  # <10>
+            result['msg'] = header+data            
+            writedb(result['msg'],systime,0,gDBhdl) 
+            print('{0} Received from {1}:\t{2}'.format(rxtime,vhl.client,result['msg'].hex().upper()))  # <10>
 
     return result
 
@@ -167,21 +101,21 @@ async def handle_vehicle_connection(reader, writer):  # <3>
         print(client,' Waiting msg...')
 
         #处理接收消息
-        result = await receiveMsg(client,reader)
+        result = await receiveMsg(vhl,reader)
         if result['responsecode'] == 0:
             msg = result['msg']
         else:
-            break
-        
+            break        
         #处理响应消息
         result = vhl.processMsg(msg)        
         responseMsg = result['msg']
         if responseMsg:
             await sendMsg(writer,responseMsg)
-        if result['responsecode'] == 'Close':
+        if result['responsecode'] == 'Close':            
             break
 
-    print('Close the client socket')  # <17>
+    print('Close the client socket')
+    vhl.destroy() # <17>
     writer.close()  # <18>
 # END xTSPSimulator_TOP
 

@@ -39,15 +39,13 @@ class Head:
         self.secretflg = Field('加密方式', header[21])
         self.length = Field('数据长度', header[22:24], convertfunc=lambda x: int(x.hex(),16))
 
-class GBTime:
-    def __init__(self,buf:bytes):
-        pass
 class OTAGBData:
     def __init__(self, msg:bytes):
         '''
         接收字节流数据作为初始化OTAGB消息的参数，对消息进行初始化
         '''
         if self.detectMsgFormat(msg):
+            self.raw = msg
             self.head = Head(msg[:24])
             self.payload = msg[24:-1]
             self.chk = msg[-1]

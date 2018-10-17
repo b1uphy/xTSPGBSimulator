@@ -31,11 +31,15 @@ from Crypto.Cipher import AES
 from bidict import bidict
 import json
 from async_timeout import timeout
-# from xDUTDBSevice import getDUTInfo,getDUTInfoByVIN,generateTUKEY,setDUTInfo
-from xDUTDBSeviceFake import getDUTInfo,getDUTInfoByVIN,generateTUKEY,setDUTInfo
 from queue import Queue
+
+# from xDUTDBSevice import getDUTInfo,getDUTInfoByVIN,generateTUKEY,setDUTInfo
+from xDBSErvice.xDUTDBSeviceFake import getDUTInfo,getDUTInfoByVIN,generateTUKEY,setDUTInfo
+
 # 全局字典，保存登入车辆的实例句柄
-gDictVhlCc = {}
+#gIMEIDict用于保存连接到服务器的车辆和advisor的对象句柄，结构{imei_0:{'vhl':vhl_instance_0,'advisor':advisor_instance_0},...}
+gIMEIDict = {}
+
 
 def decryptBWOTA(tukey:bytes,dsptchr_sg1_bdy_sg2:bytes) -> bytes:
     '''
@@ -263,7 +267,9 @@ class BWBody:
 # BEGIN APP Layer/
 class VehicleAgent:
     def __init__(self,interface,firstmsg:bytes=None,**config):
-        global gDictVhlCc
+        global gIMEIDict
+        self.register = gIMEIDict
+        # self.registerFlag = False
         self.imei = None
         self.info = None
         print(interface)
@@ -313,6 +319,11 @@ class VehicleAgent:
             #First msg, init connection in app level and get vehicle infomation from database
             self.imei = header.IMEI.phy
             print('imei=',self.imei)
+
+            if not (self.imei in self.register.keys()):
+                self.register[self.imei] = {}
+            self.register[self.imei]['vhl'] = self
+
             self.info = getDUTInfo(self.imei)
         else:
             self.state = 'connected'
@@ -483,14 +494,27 @@ class VehicleAgent:
         print('txMsg2Advisor: return')
 
 class AdvisorAgent:
-    def __init__(self,client,**config):
+    def __init__(self,client,firstmsg:bytes=None,**config):
+        global gIMEIDict
+        self.register = gIMEIDict
         self.client = client
         self.info = None
         self.vhl = None
+        self.imei = None
         self.msglist = self.initMsgList()
 
     def processMsg(self,msg:bytes):
         json.loads(msg.decode('utf8'))
+
+        if not self.imei:
+            #First msg, init connection in app level and get vehicle infomation from database
+            self.imei = header.IMEI.phy
+            print('imei=',self.imei)
+
+            if not (self.imei in gIMEIDict.keys()):
+                gIMEIDict[self.imei] = {}
+            gIMEIDict[self.imei]['vhl'] = self
+
 
     def bindVehicle(self):
         self.vhl = None
