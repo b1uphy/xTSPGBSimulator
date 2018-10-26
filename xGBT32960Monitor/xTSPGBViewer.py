@@ -7,6 +7,9 @@
 str_Version = 'v0.1'
 str_Title = 'GB大数据监视器'
 
+import sys
+sys.path.append(sys.path[0].rsplit('\\',1)[0])
+
 import xDBService.xDBService as xdbs
 import time
 from tkinter import *

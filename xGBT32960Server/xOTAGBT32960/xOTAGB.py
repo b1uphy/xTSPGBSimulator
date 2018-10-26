@@ -78,11 +78,11 @@ def genGBTime()->bytes:
 
     return gbtime
 
-def createOTAGBMsg(cmd:bytes, resp:bytes, VIN:bytes, secrettype:int, length:int, data:bytes):
+def createOTAGBMsg(cmd:bytes, resp:bytes, VIN:str, secrettype:int, length:int, data:bytes):
     '''
     '''
     start = b'##'
-    payload = cmd+resp+VIN+secrettype.to_bytes(1,byteorder='big')+length.to_bytes(2,byteorder='big')+data
+    payload = cmd+resp+VIN.encode('ascii')+secrettype.to_bytes(1,byteorder='big')+length.to_bytes(2,byteorder='big')+data
     chk = calBCCChk(payload)
     msg = start + payload + chk
     return msg
