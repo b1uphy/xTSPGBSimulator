@@ -59,7 +59,7 @@ class Vehicle:
                 await self.sendMsg(responseMsg)
             if result['code'] == 'Close':            
                 break        
-        self.destroy()
+
 
     def processMsg(self,msg)->bytes:
         result = {'msg':None, 'code':0}
@@ -249,11 +249,11 @@ class Advisor:
             print('Advisor {0} counter=xxx'.format(self.username))
 
         done,pending = await wait([self.rxloop(),self.txloop()])
-
+        for f in pending:
+            f.cancel()
         if xDEBUG:
             print('End advisor subloop')
        
-        self.destroy()
 
     async def rxloop(self):
         if xDEBUG:
@@ -366,14 +366,18 @@ class Advisor:
     def processMsg(self,msg:bytes):
         result = {'msg':None, 'code':0}
         msgobj = json.loads(msg[3:].decode('utf8'))
-        if msgobj['name'] == 'login':
-            self.login(msgobj)
-        elif msgobj['name'] == 'select_vehicle':
-            self.selectVhl(msgobj)
-        elif msgobj['name'] == 'disconnect_vehicle':
-            self.unregister()
-        elif msgobj['name'] == 'echo':
-            self.echo(msgobj)    
+        if type(msgobj) == dict:
+            if msgobj['name'] == 'login':
+                self.login(msgobj)
+            elif msgobj['name'] == 'select_vehicle':
+                self.selectVhl(msgobj)
+            elif msgobj['name'] == 'disconnect_vehicle':
+                self.unregister()
+            elif msgobj['name'] == 'echo':
+                self.echo(msgobj)
+        else:
+            print('WARNING: msg format error : {0}'.format(msg.hex()))
+
         return result
 
 # END APP layer

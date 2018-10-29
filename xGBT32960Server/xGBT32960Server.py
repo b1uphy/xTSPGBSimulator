@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-10-29 11:20:58 by xw: v0.3.1 更新xGBT32960ServerCore，处理advisor interface接收消息格式错误
 # 2018-10-26 17:08:06 by xw: v0.3 更新Vehicle类，简化server架构，使vehicle interface和advisor interface结构统一
 # 2018-10-17 11:32:06 by xw: v0.2 拆分应用层部分到单独文件，增加应用层日志功能
 # 2018-05-24 16:52 by xw: new created.
@@ -47,6 +48,7 @@ async def handle_vehicle_connection(reader, writer):
     vhl = Vehicle(reader,writer,gDBhdl)
     await vhl.startloop()
     print('Close the connection with vehicle VIN={0}'.format(vhl.VIN))
+    vhl.destroy()
     vhl = None
 
 
@@ -54,6 +56,7 @@ async def handle_advisor_connection(reader:asyncio.StreamReader, writer:asyncio.
     advisor = Advisor(reader,writer)
     await advisor.startloop()
     print('Close the connection with advisor:{0}'.format(advisor.username))
+    advisor.destroy()
     advisor = None
     
 # END xTSPSimulator_TOP
