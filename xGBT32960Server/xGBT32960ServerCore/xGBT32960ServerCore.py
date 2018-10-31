@@ -3,6 +3,8 @@
 # bluphy@163.com
 # 2018-10-16 14:11:02 by xw: new created.
 
+msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
+
 # BEGIN Calibration
 TIMER_OTA_MSG_TIMEOUT = 30
 LISTEMING_PORT = 9201
@@ -21,6 +23,8 @@ import asyncio
 from asyncio import Queue,QueueEmpty,wait
 
 from async_timeout import timeout
+
+import base64
 
 from xDBService.xDBService import writedb
 from xOTAGBT32960.xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime
@@ -153,7 +157,10 @@ class Vehicle:
         finally:
             print('register vehicle {0}'.format(self.VIN))
             gVIN_Vhl_Advisor_Mapping[self.VIN]['vhl'] = self
-    
+
+    def createGBT32960Msg(self,msg):
+        return json.dumps({'name':'gbdata','data':base64.standard_b64encode(msg).decode('ascii')}).encode('utf8')
+
     def forward2Advisor(self,msg):
        
         try:
@@ -162,7 +169,7 @@ class Vehicle:
             pass            
         else:
             if self.advisor:
-                self.advisor.putVhlMsg(msg)
+                self.advisor.putVhlMsg(self.createGBT32960Msg(msg))
                 if xDEBUG:
                     print('forward2Advisor') 
 
@@ -288,36 +295,65 @@ class Advisor:
                 break
             else:
                 print('{0} Send Msg to advisor {1}: {2}'.format(timestamp,self.username,msg.hex()))
+            finally:
+                txcounter += 1
 
-            txcounter += 1
-
-            if xDEBUG:
-                print(result['code'])
-                print('Advisor {0} tx counter {1}'.format(self.username,txcounter))            
-        
+                if xDEBUG:
+                    print(result['code'])
+                    print('Advisor {0} tx counter {1}'.format(self.username,txcounter))            
+            
     async def receiveMsg(self,timeout=-1):
         result = {'msg':None, 'code':0}
+        raw = None
         header = None
         body = None
 
-        header = await self.reader.readexactly(3)                
+        # header = await self.reader.readexactly(3)                
 
+        # length = int.from_bytes(header, byteorder='big')
+        # #print('length:{}'.format(length))
+
+        # body = await self.reader.readexactly(length)
+        raw = await self.reader.readline()
+        header =  raw[:3]          
         length = int.from_bytes(header, byteorder='big')
-        #print('length:{}'.format(length))
+        body = raw[3:-1]
 
-        body = await self.reader.readexactly(length)
         systime = time.time()
         if body:
-            result['msg'] = header+body            
+            result['msg'] = body            
             # writedb(result['msg'],systime,0,gDBhdl) 
             timestamp = time.strftime('%Y%m%d %H:%M:%S',time.localtime(systime))
-            print('{0} Received from advisor {1}:\t{2}'.format(timestamp,self.client,result['msg'][3:].decode('utf8'))) 
+            print('{0} Received from advisor {1}:\t{2}'.format(timestamp,self.client,result['msg'].decode('utf8'))) 
 
         return result
 
-    async def sendMsg(self,msg:bytes):
+    def reply(self,ack):
+        self.outputQueue.put_nowait(json.dumps(ack).encode('utf8'))
+
+    def replyOK(self,msgobj):
+        if xDEBUG:
+            print('reply')
+        ack = eval(msg_ack)
+        ack['data']['name'] = msgobj['name']
+        ack['data']['reply']['result'] = 'OK'
+        # ack['data']['reply']['data'] = ''
+        self.reply(ack)
+
+    def replyOKWithData(self,msgobj,data:str):
+        if xDEBUG:
+            print('reply')
+        ack = eval(msg_ack)
+        ack['data']['name'] = msgobj['name']
+        ack['data']['reply']['result'] = 'OK'
+        ack['data']['reply']['data'] = data
+        self.reply(ack)
+
+    async def sendMsg(self,body:bytes):
         result = {'msg':None, 'code':0}
-        self.writer.write(msg)
+        tail = b'\n'
+        header = len(body).to_bytes(3,'big')
+        self.writer.write(header+body+tail)
         await self.writer.drain()
         return result
 
@@ -346,6 +382,8 @@ class Advisor:
 
     def login(self,msgobj):        
         self.username = msgobj['data']['username']
+        self.replyOK(msgobj)
+
         print('advisor {0} login'.format(self.username))
 
     def selectVhl(self,msgobj):
@@ -353,19 +391,24 @@ class Advisor:
         self.VIN = msgobj['data']['VIN']
         print('advisor {0} select vehicle {1}'.format(self.username,self.VIN))
         self.register()
+        self.replyOK(msgobj)
 
     def disconnect_vehicle(self,msgobj):
         self.unregister()
+        self.replyOK(msgobj)
 
     def echo(self,msgobj):
-        print('Advisor is {0}, selected vehicle {1}'.format(self.username,self.VIN))
+        replydata = 'Advisor is {0}, selected vehicle {1}'.format(self.username,self.VIN)
+        self.replyOKWithData(msgobj,replydata)
+        print(replydata)
 
     def logout(self,msgobj):
+        self.replyOK(msgobj)
         self.destroy()
-
+        
     def processMsg(self,msg:bytes):
         result = {'msg':None, 'code':0}
-        msgobj = json.loads(msg[3:].decode('utf8'))
+        msgobj = json.loads(msg.decode('utf8'))
         if type(msgobj) == dict:
             if msgobj['name'] == 'login':
                 self.login(msgobj)

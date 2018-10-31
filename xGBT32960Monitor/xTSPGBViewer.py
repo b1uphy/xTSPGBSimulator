@@ -10,11 +10,13 @@ str_Title = 'GB大数据监视器'
 import sys
 sys.path.append(sys.path[0].rsplit('\\',1)[0])
 
-import xDBService.xDBService as xdbs
+# import xDBService.xDBService as xdbs
 import time
 from tkinter import *
 from tkinter.ttk import *
 import socket
+
+import xSigGenerator
 
 def parseGBTime (raw:str):
     print('gbtime raw=',raw)
@@ -80,29 +82,29 @@ class xGBT32960Monitor(Frame):
         return 'Not Connect'
 
 
-def testDB():
-    loginmsg = bytes.fromhex('232301FE4C58564433473242364A4130303032303501001E12041B09281F000438393836303631373031303030313335313335370100E7')
-    logoutmsg = b'##\x01\xFELXVJ2GFC2GA030003\x04\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
+# def testDB():
+    # loginmsg = bytes.fromhex('232301FE4C58564433473242364A4130303032303501001E12041B09281F000438393836303631373031303030313335313335370100E7')
+    # logoutmsg = b'##\x01\xFELXVJ2GFC2GA030003\x04\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
 
-    dbhdl = xdbs.connectdb('borgward_db','borgward', '123456','10.40.166.7',5432)
-    conn = dbhdl['connection']
-    cur = dbhdl['cursor']
+    # dbhdl = xdbs.connectdb('borgward_db','borgward', '123456','10.40.166.7',5432)
+    # conn = dbhdl['connection']
+    # cur = dbhdl['cursor']
     # xdbs.writedb(logoutmsg,time.time(),0,dbhdl)
 
-    cur.execute("SELECT * FROM gbt32960 WHERE vin='LMGFE1G0000000SY1' LIMIT 10;")
-    count = 0
-    for record in cur:
-        vin = record[0]
-        msgtime = '采集时间: '+parseGBTime(record[1].tobytes().hex())[0]
-        systime = '\t系统时间：{0}\traw sec:{1}'.format(time.strftime('%Y-%m-%d %H:%M:%S',time.gmtime(record[2])) ,record[2])
-        print(vin,msgtime,systime)
-        count+=1
+    # cur.execute("SELECT * FROM gbt32960 WHERE vin='LMGFE1G0000000SY1' LIMIT 10;")
+    # count = 0
+    # for record in cur:
+        # vin = record[0]
+        # msgtime = '采集时间: '+parseGBTime(record[1].tobytes().hex())[0]
+        # systime = '\t系统时间：{0}\traw sec:{1}'.format(time.strftime('%Y-%m-%d %H:%M:%S',time.gmtime(record[2])) ,record[2])
+        # print(vin,msgtime,systime)
+        # count+=1
         
-    cur.close()
-    conn.close()
-    if count>5:
-        print('DBtest OK')
-    return 0
+    # cur.close()
+    # conn.close()
+    # if count>5:
+        # print('DBtest OK')
+    # return 0
 
 if __name__ == '__main__':
 
