@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
-# 2018-10-31 16:28:08 by xw: v0.4.1 Rename the advisor register/unregister function to bindVhl and unbindVhl, fix a bug when unbind vehicle
-# 2018-10-31 15:19:23 by xw: v0.4 更新xGBT32960ServerCore，支持回复Advisor的请求消息
-# 2018-10-29 11:20:58 by xw: v0.3.1 更新xGBT32960ServerCore，处理advisor interface接收消息格式错误"
+
 # 2018-10-16 14:11:02 by xw: new created.
 
 msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
