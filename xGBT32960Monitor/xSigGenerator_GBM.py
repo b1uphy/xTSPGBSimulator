@@ -112,7 +112,7 @@ class xGBMonitor:
                     
                     print(msg,'\n?>',end='')
                     # print(gbdata_hndl(data),'\n?>',end='')
-        print('rx stopped','\n?>',end='')
+        print('rx stopped','\n',end='')
         
     def closeSocket(self):
         self.s.close()

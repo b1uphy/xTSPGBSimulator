@@ -9,7 +9,7 @@
 # TODO: 
 # 
 
-str_version = 'v0.4'
+str_version = 'v0.4.1'
 
 # BEGIN Calibration
 DBHOST = '127.0.0.1'

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-10-31 16:28:08 by xw: v0.4.1 Rename the advisor register/unregister function to bindVhl and unbindVhl, fix a bug when unbind vehicle
+# 2018-10-31 15:19:23 by xw: v0.4 更新xGBT32960ServerCore，支持回复Advisor的请求消息
+# 2018-10-29 11:20:58 by xw: v0.3.1 更新xGBT32960ServerCore，处理advisor interface接收消息格式错误"
 # 2018-10-16 14:11:02 by xw: new created.
 
 msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
@@ -358,27 +361,28 @@ class Advisor:
         return result
 
     def destroy(self):
-        self.unregister()
+        self.unbindVhl()
         self.writer.close()
         print('Advisor {0} disconnected'.format(self.username))
 
-    def register(self):       
+    def bindVhl(self):       
         try:
             gVIN_Vhl_Advisor_Mapping[self.VIN]
         except KeyError:
             gVIN_Vhl_Advisor_Mapping[self.VIN] = {}
         finally:
-            print('register advisor {0} to vehicle {1}'.format(self.username,self.VIN))
+            print('bind advisor {0} to vehicle {1}'.format(self.username,self.VIN))
             gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor'] = self
 
-    def unregister(self):
+    def unbindVhl(self):
         try:
             gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor']
         except KeyError:
-            print("advisor {0} NOT registed")
+            print("advisor {0} NOT bind with vehicle yet")
         else:
-            print('unregister advisor {0} to vehicle {1}'.format(self.username,self.VIN))  
+            print('unbind advisor {0} to vehicle {1}'.format(self.username,self.VIN))  
             gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor'] = None 
+            self.VIN = ''
 
     def login(self,msgobj):        
         self.username = msgobj['data']['username']
@@ -387,14 +391,14 @@ class Advisor:
         print('advisor {0} login'.format(self.username))
 
     def selectVhl(self,msgobj):
-        self.unregister()
+        self.unbindVhl()
         self.VIN = msgobj['data']['VIN']
         print('advisor {0} select vehicle {1}'.format(self.username,self.VIN))
-        self.register()
+        self.bindVhl()
         self.replyOK(msgobj)
 
     def disconnect_vehicle(self,msgobj):
-        self.unregister()
+        self.unbindVhl()
         self.replyOK(msgobj)
 
     def echo(self,msgobj):
@@ -415,7 +419,7 @@ class Advisor:
             elif msgobj['name'] == 'select_vehicle':
                 self.selectVhl(msgobj)
             elif msgobj['name'] == 'disconnect_vehicle':
-                self.unregister()
+                self.disconnect_vehicle(msgobj)
             elif msgobj['name'] == 'echo':
                 self.echo(msgobj)
         else:
