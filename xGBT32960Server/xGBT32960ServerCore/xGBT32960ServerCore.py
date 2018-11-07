@@ -17,7 +17,7 @@ gVIN_Vhl_Advisor_Mapping = {}
 xDEBUG = True
 
 import sys
-sys.path.append('D:\\bluphy\\nutcloud\\xProject\\LogParser')
+# sys.path.append('D:\\bluphy\\nutcloud\\xProject\\LogParser')
 
 import time,json
 import asyncio
@@ -27,9 +27,9 @@ from async_timeout import timeout
 
 import base64
 
-from xDBService.xDBService import writedb
-from xOTAGBT32960.xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime
-from xOTAGBT32960.GB_PARSER_HANDLER import parseGBPkgs
+from xTSPGBSimulator.xDBService.xDBService import writedb
+from xTSPGBSimulator.xOTAGBT32960.xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime
+from xTSPGBSimulator.xOTAGBT32960.GB_PARSER_HANDLER import parseGBPkgs
 # BEGIN APP Layer/
 class Vehicle:
     def __init__(self,reader,writer,dbhdl):

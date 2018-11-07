@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-07 19:20:35 by xw: v0.2 support to monitor GB data 01
 # 2018-09-07 19:42:24 by xw: fix bug when vin contains null character
 # 2018-7-20 11:50:55 by xw: new created.
 
-str_Version = 'v0.1'
+xDEBUG = False
+
+str_Version = 'v0.2'
 str_Title = 'GB大数据监视器'
 
 import sys
@@ -15,8 +18,14 @@ import time
 from tkinter import *
 from tkinter.ttk import *
 import socket
+from threading import Thread
 
-import xSigGenerator
+from xTSPGBSimulator.xOTAGBT32960.xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime
+from xTSPGBSimulator.xOTAGBT32960.GB_PARSER_HANDLER import parseGBPkgs
+from xSigGenerator_GBM import *
+
+COLUMNS = ['数据项名称','值','范围','单位','有效性']
+
 
 def parseGBTime (raw:str):
     print('gbtime raw=',raw)
@@ -39,49 +48,264 @@ def parseGBTime (raw:str):
         return [year+'-'+month+'-'+date+' '+(len(hour)%2)*'0'+hour+':'+(len(minute)%2)*'0'+minute+':'+(len(sec)%2)*'0'+sec]
 
 
-class xGBT32960Monitor(Frame):
-    def __init__(self,master=None):
-        super(xGBT32960Monitor,self).__init__(master)
-        self.grid(sticky='nesw')
-        self.rowconfigure(10,weight=1)
-        self.columnconfigure(10,weight=1)
+class xGBT32960MonitorView():
+    def __init__(self):
+        self.root=Tk()
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        self.root.title(str_Title +' '+ str_Version)
+        self.root.grid()
 
-        self.vhlLbl = Label(self,text='Vehicle')
-        self.vhlLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
-        self.vhl = StringVar()
-        self.vhlEntry = Entry(self,textvariable=self.vhl)
-        self.vhlEntry.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+        self.frame = Frame(self.root)
+        self.frame.grid(row=0,rowspan=1,column=0,columnspan=1,sticky='nesw')
+        self.frame.rowconfigure(20,weight=1)
+        self.frame.columnconfigure(20,weight=1)
 
-        self.connectingStatus = StringVar()
-        self.connectingStatus.set('Not Connect')
+        self.menubar = Frame(self.frame)
+        self.menubar.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.vhlViewFrame = Frame(self.frame)
+        self.vhlViewFrame.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.vhlViewFrame.rowconfigure(10,weight=1)
+        self.vhlViewFrame.columnconfigure(10,weight=1)
+
+        self.vhlInfoFrame = Frame(self.vhlViewFrame)
+        self.vhlInfoFrame.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.VINLbl = Label(self.vhlInfoFrame,text='Vehicle')
+        self.VINLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.VIN = StringVar()
+        self.VINEntry = Entry(self.vhlInfoFrame,textvariable=self.VIN)
+        self.VINEntry.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+
+        self.bindingActionStrVar = StringVar()
+        self.bindingActionStrVar.set('Bind')
         
-        self.connectBtn = Button(master,textvariable=self.connectingStatus,command=self.toggleConnection)
-        self.connectBtn.grid(row=10,rowspan=1,column=10,columnspan=10,sticky=N+S+E+W)
+        self.toggleBindingBtn = Button(self.vhlInfoFrame,textvariable=self.bindingActionStrVar)
+        self.toggleBindingBtn.grid(row=10,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
 
-    def toggleConnection(self,event):
+        self.echoBtn = Button(self.vhlInfoFrame,text='echo')
+        self.echoBtn.grid(row=20,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
+
+        self.vhlLoggingInfoFrame = Frame(self.vhlInfoFrame)
+        self.vhlLoggingInfoFrame.grid(row=30,rowspan=1,column=10,columnspan=21,sticky=N+S+E+W)
+        self.vhlLoggingInfoFrame.rowconfigure(10,weight=1)
+        self.vhlLoggingInfoFrame.rowconfigure(10,weight=1)
+        self.vhlLoggingInfoFrame.columnconfigure(10,weight=1)
+        self.vhlLoggingInfoFrame.columnconfigure(20,weight=1)
+        self.vhlLoggingInfoFrame.columnconfigure(30,weight=1)
+        self.vhlLoggingInfoFrame.columnconfigure(40,weight=1)
+
+        self.loginLbl = Label(self.vhlLoggingInfoFrame,text='登入流水号:')
+        self.loginLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.loginFlownum= StringVar()
+        self.loginFlownumLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.loginFlownum)
+        self.loginFlownumLbl.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+
+        self.loginTimeLbl = Label(self.vhlLoggingInfoFrame,text='登入时间:')
+        self.loginTimeLbl.grid(row=10,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
+
+        self.loginTime= StringVar()
+        self.loginTimeValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.loginTime)
+        self.loginTimeValueLbl.grid(row=10,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
+
+        self.logoutLbl = Label(self.vhlLoggingInfoFrame,text='登出流水号:')
+        self.logoutLbl.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.logoutFlownum= StringVar()
+        self.logoutFlownumLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.logoutFlownum)
+        self.logoutFlownumLbl.grid(row=20,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+
+        self.logoutTimeLbl = Label(self.vhlLoggingInfoFrame,text='登出时间:')
+        self.logoutTimeLbl.grid(row=20,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
+
+        self.logoutTime= StringVar()
+        self.logoutTimeValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.logoutTime)
+        self.logoutTimeValueLbl.grid(row=20,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
+
+        self.collectTime = StringVar()
+        self.collectTimeLbl = Label(self.vhlLoggingInfoFrame,text='采集时间')
+        self.collectTimeLbl.grid(row=30,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
+        self.collectTimeValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.collectTime)
+        self.collectTimeValueLbl.grid(row=30,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
+
+
+        self.msgListFrame = Frame(self.vhlViewFrame)
+        self.msgListFrame.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        # self.msgListbox = Listbox(self.msgListFrame)
+        # self.msgListbox.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.vhlRTDataFrame = Frame(self.vhlViewFrame)
+        self.vhlRTDataFrame.grid(row=10,rowspan=11,column=20,columnspan=1,sticky=N+S+E+W)
+        self.vhlRTDataFrame.rowconfigure(10,weight=1)
+        self.vhlRTDataFrame.columnconfigure(10,weight=1)
+
+        self.vhlRTDataTree = Treeview(self.vhlRTDataFrame,columns=COLUMNS)
+        self.vhlRTDataTree.grid(row=10,rowspan=11,column=20,columnspan=1,sticky=N+S+E+W)
+
+        # self.vhlRTDataTree.column(COLUMNS[0], width=5, anchor='e')
+        # self.vhlRTDataTree.column(COLUMNS[1], width=5, anchor='e')
+        # self.vhlRTDataTree.column(COLUMNS[2], width=5, anchor='w')
+        # self.vhlRTDataTree.column(COLUMNS[3], width=5, anchor='w')
+        # self.vhlRTDataTree.column(COLUMNS[4], width=5, anchor='w')
+
+        for i in range(len(COLUMNS)):
+            self.vhlRTDataTree.column(COLUMNS[i],  anchor='e')
+            self.vhlRTDataTree.heading(COLUMNS[i], text=COLUMNS[i])
+
+        # self.logWindow = Text(self.vhlRTDataFrame)
+        # self.logWindow.grid(row=10,rowspan=11,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.status = StringVar()
+        self.status.set('Hello')
+        self.statusbar = Label(self.frame,textvariable=self.status)
+        self.statusbar.grid(row=30,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+class xGBT32960MonitorController():
+    def __init__(self):
+        self.closeflag = False
+
+        self.view = xGBT32960MonitorView()        
+        self.view.toggleBindingBtn.bind('<Button-1>',self.toggleBinding)
+        self.view.echoBtn.bind('<Button-1>',self.echo)
+
+        self.model = xGBT32960MonitorModel()
+        self.setConfig()
+        self.connectTSP(None)
+        self.rxthd = Thread(target=self.rxloop)
+        self.rxthd.start()
+        self.login(None)
+        self.rtViewInitFlag = False
+        self.view.VIN.set('LMGFE1G0000000SY1')
+        self.view.root.mainloop()
+        
+        self.closeflag = True
+        self.model.rxq.put(None)
+        time.sleep(0.1)
+        self.model.destroy()
+        time.sleep(0.1)
+        self.model = None
+
+    def setConfig(self,*args,**keywors):
         pass
-
-    def connectTSP(self,host,port):       
-        print('Creating socket...')
-        result = -1
-        try:
-            self.skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            #gSocket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,)
-            self.skt.connect((host,port))
-            self.socketName = self.skt.getsockname()
-            print('Client info: ',self.socketName)
-            
-        except:
-            print('Connecting failed, retry after 10 seconds')
-            time.sleep(10)
-        else:
-            result = 0
-        return result
+        self.model.username = 'ui_tester'
+        self.model.server_ip = SERVER_IP
+        self.model.server_port = SERVER_PORT
 
     def getVhlConnectingStatus(self):
-        return 'Not Connect'
+        return 'To Be Implement'
 
+    def toggleBinding(self,event):
+        print('toggle function')
+        if self.model.binded:
+            self.unbindVhl(event)
+            self.view.bindingActionStrVar.set('bind')
+        else:
+            self.bindVhl(event)
+            self.view.bindingActionStrVar.set('unbind')
 
+    def connectTSP(self,event):      
+        self.model.createSocket()
+    
+    def login(self,event):
+        self.model.sendMsg(self.model.create_msg_login())
+
+    def echo(self,event):
+        self.model.sendMsg(eval(msg_echo))
+        self.view.status.set('echo')
+
+    def bindVhl(self,event):
+        VIN = self.view.VIN.get().strip().upper()
+        self.model.VIN = VIN
+        self.model.sendMsg(self.model.create_msg_select_vehicle())
+        self.model.binded = True
+
+    def unbindVhl(self,event):
+        self.model.sendMsg(eval(msg_disconnect_vehicle))
+        self.model.binded = False
+        self.clearView()
+
+    def logout(self,event):
+        self.model.destroy()
+        self.model=None
+
+    def showMsg(self):
+        msg = self.model.rxq.get()
+        if not msg: return
+        msgstr = '{0}\n'.format(msg)
+        if msg['name']=='gbdata':
+            gbRaw = base64.standard_b64decode(msg['data'].encode('ascii'))
+            self.showGBT32960Msg(gbRaw)
+        # self.view.logWindow.insert(END,msgstr)
+        else:
+            self.view.status.set(msg)
+
+    def showLogin(self,gbobj):
+        self.view.loginFlownum.set(gbobj.payload.flownum.phy)
+        self.view.loginTime.set(gbobj.payload.gbtime.phy)
+
+    def showLogout(self,gbobj):
+        self.view.logoutFlownum.set(gbobj.payload.flownum.phy)
+        self.view.logoutTime.set(gbobj.payload.gbtime.phy)
+
+    def showGBData(self,gbobj):
+        if not self.rtViewInitFlag:
+            self.initRTDataView(gbobj)
+
+        for f in gbobj.payload.phy:
+            if f.name != '采集时间':
+                # self.view.vhlRTDataTree.insert('','end',iid=f.name,values=(f.name,'','','',''))
+                for element in f.phy:
+                    self.view.vhlRTDataTree.set(element.name,column=COLUMNS[1],value=element.phy)
+                    if xDEBUG: print(element.name,'\t',element.phy)
+                #     self.view.vhlRTDataTree.insert(f.name,'end',iid=element.name,values=(element.name,element.phy,'','',''))
+            else:
+                self.view.collectTime.set(f.phy)
+    def showGBT32960Msg(self,gbRaw:bytes):
+        print(gbRaw)
+        gbobj = OTAGBData(gbRaw)
+        msgname = gbobj.name
+        if msgname==CMD[b'\x01']:
+            if xDEBUG:  print('登入：{}'.format(self.model.VIN))
+            self.showLogin(gbobj)
+        elif msgname==CMD[b'\x04']:
+            if xDEBUG:  print('登出：{}'.format(self.model.VIN))
+            self.showLogout(gbobj)
+        elif msgname in {CMD[b'\x02'],CMD[b'\x03']}:
+            if xDEBUG:  print('数据：{}'.format(self.model.VIN))
+            self.showGBData(gbobj)
+        else:
+            if xDEBUG:  print('其他：{}'.format(self.model.VIN))
+            print('CMD {}'.format(msgname))
+
+    def initRTDataView(self,gbobj):
+        for f in gbobj.payload.phy:
+            if f.name != '采集时间':
+                self.view.vhlRTDataTree.insert('','end',iid=f.name,text=f.name,values=(f.name,'','','',''))
+                for element in f.phy:
+                    self.view.vhlRTDataTree.insert('','end',iid=element.name,text=element.name,values=(element.name,element.phy,'','',''))
+            else:
+                self.view.collectTime.set(f.phy)
+        self.rtViewInitFlag = True
+
+    def clearView(self):
+        kids = self.view.vhlRTDataTree.get_children()
+        [self.view.vhlRTDataTree.delete(kid) for kid in kids]
+        self.rtViewInitFlag = False
+
+        self.view.loginFlownum.set('')
+        self.view.logoutFlownum.set('')
+        self.view.loginTime.set('')
+        self.view.logoutTime.set('')
+
+    def rxloop(self):
+        while not self.closeflag:            
+            self.showMsg() #this function will block until get a msg from server
+        print('exit Controller rxloop')
+
+    
 # def testDB():
     # loginmsg = bytes.fromhex('232301FE4C58564433473242364A4130303032303501001E12041B09281F000438393836303631373031303030313335313335370100E7')
     # logoutmsg = b'##\x01\xFELXVJ2GFC2GA030003\x04\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
@@ -108,17 +332,7 @@ class xGBT32960Monitor(Frame):
 
 if __name__ == '__main__':
 
-
-    root=Tk()
-    root.columnconfigure(0, weight=1)
-    root.rowconfigure(0, weight=1)
-    root.grid()
-    # root.resizable(False,False)
-    # goemtrystr = '+{0}+{1}'.format((screensize[0]-xWIDTH)//2,(screensize[1]-xHEIGHT)//2)
-    # root.geometry(goemtrystr)
-    # root.minsize(xWIDTH, 240)
-    app=xGBT32960Monitor(master=root)
-    app.master.title(str_Title +' '+ str_Version)
-    app.mainloop()
+    app=xGBT32960MonitorController()
+    print('Program Exit')
     
         

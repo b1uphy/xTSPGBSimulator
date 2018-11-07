@@ -1,20 +1,28 @@
 #Echo client program
 #made by bluphy
 #contact @163.com
+# 2018-10-31 18:24:07 by xw: v0.4 Fix bug txloop does not stopped when model destroied
 # 2018-10-31 15:07:15 by xw: v0.3 supply to get reply msg from server
 # 2018-09-25 16:34:13 by xw: 
 
-str_version = 'v0.3'
-
+str_version = 'v0.4'
+import logging
 import socket,time,sys,json
 from threading import Thread
 from queue import Queue
 
 import base64
 
-SERVER_IP = '127.0.0.1'
-# SERVER_IP = '10.40.166.7'
+# SERVER_IP = '127.0.0.1'
+SERVER_IP = '10.40.166.7'
 SERVER_PORT = 31029             # The same port as used by the server
+
+# SERVER_IP = '10.40.166.8'
+# SERVER_PORT = 9201
+
+# SERVER_IP = '218.1.38.234'
+# SERVER_PORT = 1002
+
 
 #### BEGIN message template
 msg_login = "{'name': 'login', 'data': {'username': ''} }"
@@ -22,34 +30,25 @@ msg_select_vehicle = "{'name': 'select_vehicle', 'data': {'VIN': ''} }"
 msg_logout = "{'name': 'logout', 'data': '' }"
 msg_disconnect_vehicle = "{'name': 'disconnect_vehicle', 'data': '' }"
 msg_echo  = "{'name': 'echo', 'data': '' }"
-msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}"
+msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
 #### END## message template
 
 msg_select_vehicle1 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G0000000SY1'} }"
 msg_select_vehicle2 = "{'name': 'select_vehicle', 'data': {'VIN': 'LXVJ2GFC2GA030003'} }"
 msg_select_vehicle3 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G88D1022SY5'} }"
 
-def gbdata_hndl(data):
-    gbmsg = base64.standard_b64decode(data.encode('utf8'))
-    return gbmsg
-    
-def create_msg_select_vehicle(VIN:str):
-    msg = eval(msg_select_vehicle)
-    msg['data']['VIN']=VIN
-    return msg
-    
-def create_msg_login(username:str):
-    msg = eval(msg_login)
-    msg['data']['username']=username
-    return msg
 
 def help(cmd=None):
     print('Hello!!')
 
-class xGBMonitor:
+class xGBT32960MonitorModel:
     def __init__(self):
         self.txq = Queue()
         self.rxq = Queue()
+        self.configs = {}
+        self.username = ''
+        self.VIN = ''
+        self.binded = False
         # self.createSocket()
         
     def sendMsg(self,msg:dict):
@@ -77,16 +76,16 @@ class xGBMonitor:
         self.rxthd.start()
         
     def txMsg(self):
-        while True:
-            txflag = True
+        while not self.terminateFlag:
+            # txflag = True
             msg = self.txq.get()
-            while txflag:
-                try:
-                    self.s.sendall(msg)
-                except OSError:
-                    break
-                else:
-                    txflag = False
+            # while txflag:
+            try:
+                self.s.sendall(msg)
+            except OSError:
+                break
+            # else:
+                    # txflag = False
         print('tx stopped')    
 
         
@@ -104,15 +103,17 @@ class xGBMonitor:
                     print('connection error when rx')
                     break
                 else:
-                    self.rxq.put(body_tail[:-1])
+                    # self.rxq.put(body_tail[:-1])
                     print('')
                     msg = json.loads(body_tail[:-1].decode('utf8'))
+                    self.rxq.put(msg)
                     name = msg['name']
                     data = msg['data']
                     
                     print(msg,'\n?>',end='')
                     # print(gbdata_hndl(data),'\n?>',end='')
-        print('rx stopped','\n',end='')
+        
+        print('rx stopped','\n?>',end='')
         
     def closeSocket(self):
         self.s.close()
@@ -124,40 +125,56 @@ class xGBMonitor:
         time.sleep(3)
         self.closeSocket()
 
-        
+    def create_msg_select_vehicle(self,VIN:str = None):
+        msg = eval(msg_select_vehicle)
+        if VIN:
+            msg['data']['VIN']=VIN
+        else:
+            msg['data']['VIN']=self.VIN
+
+        return msg
+    
+    def create_msg_login(self):
+        msg = eval(msg_login)
+        msg['data']['username']=self.username
+        return msg
+
+
 def main(serverip=SERVER_IP,serverport=SERVER_PORT):
-    gbm =xGBMonitor()
+    gbm =xGBT32960MonitorModel()
 
     while True:
-        cmd = input('?>')
+        cmd = input('\n?>')
         if   cmd == 'q':
             gbm.destroy()
             gbm=None
         elif cmd=='exit':
             if gbm:
                 gbm.destroy()
-                gbm=None
+                gbm=None       
             break
         elif cmd=='s':
             gbm.createSocket(serverip,serverport)
+        elif cmd=='i':
+            gbm.username = input('username:')
+            gbm.sendMsg(gbm.create_msg_login())
+        elif cmd=='i1':
+            gbm.username = 'bwtester1'
+            gbm.sendMsg(gbm.create_msg_login())            
         elif cmd=='v':
-            gbm.sendMsg(create_msg_select_vehicle(input('VIN:').upper()))
+            gbm.sendMsg(gbm.create_msg_select_vehicle(input('VIN:').upper()))
         elif cmd=='v1':
             gbm.sendMsg(eval(msg_select_vehicle1))
         elif cmd=='v2':
             gbm.sendMsg(eval(msg_select_vehicle2))
         elif cmd=='v3':
             gbm.sendMsg(eval(msg_select_vehicle3))
-        elif cmd=='n':
-            gbm =xGBMonitor()
         elif cmd=='u':
             gbm.sendMsg(eval(msg_disconnect_vehicle))
-        elif cmd=='i':
-            gbm.sendMsg(create_msg_login(input('username:')))
-        elif cmd=='i1':
-            gbm.sendMsg(create_msg_login('bwtester1'))
         elif cmd=='e':
             gbm.sendMsg(eval(msg_echo))
+        elif cmd=='n':
+            gbm =xGBT32960MonitorModel()            
         else:
             help()
 

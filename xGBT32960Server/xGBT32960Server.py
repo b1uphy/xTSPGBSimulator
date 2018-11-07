@@ -2,6 +2,10 @@
 # -*- coding: utf8 -*-
 # bluphy@163.com
 
+# 2018-10-31 16:28:08 by xw: v0.4.2 Rename the advisor register/unregister function to bindVhl and unbindVhl, fix a bug when unbind vehicle
+# 2018-10-31 16:38:49 by xw: v0.4.1 Update version number
+# 2018-10-31 15:19:23 by xw: v0.4 更新xGBT32960ServerCore，支持回复Advisor的请求消息
+# 2018-10-29 11:20:58 by xw: v0.3.1 更新xGBT32960ServerCore，处理advisor interface接收消息格式错误"
 # 2018-10-26 17:08:06 by xw: v0.3 更新Vehicle类，简化server架构，使vehicle interface和advisor interface结构统一
 # 2018-10-17 11:32:06 by xw: v0.2 拆分应用层部分到单独文件，增加应用层日志功能
 # 2018-05-24 16:52 by xw: new created.
@@ -9,7 +13,7 @@
 # TODO: 
 # 
 
-str_version = 'v0.4.1'
+str_version = 'v0.4.2'
 
 # BEGIN Calibration
 DBHOST = '127.0.0.1'
@@ -30,7 +34,6 @@ xDEBUG = True
 
 # BEGIN xTSPSimulator_TOP
 import sys
-sys.path.append(sys.path[0].rsplit('\\',1)[0])
 
 import asyncio
 # import functools
@@ -38,7 +41,7 @@ import time
 import json
 from async_timeout import timeout
 
-from xDBService.xDBService import connectdb
+from xTSPGBSimulator.xDBService.xDBService import connectdb
 from xGBT32960ServerCore.xGBT32960ServerCore import Vehicle,Advisor
 
 gDBhdl = None

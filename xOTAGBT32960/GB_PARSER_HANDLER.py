@@ -6,9 +6,9 @@ from enum import Enum
 xDEBUG = False
 
 #### legacy global variable, latest version can handle the dynamic count of motors, battery cells and temperature probes
-gMotorCnt = 1;
-gCellCnt = 96;
-gTempProbe = 24;
+gMotorCnt = 1
+gCellCnt = 96
+gTempProbe = 24
 
 #GBLogIn数据结构初始化[DID 3E01]
 
@@ -414,7 +414,11 @@ def parseGBLogout(raw):
     gbTime = parseGBTime(raw[0:12])
     flowNumOut = [raw[12:16]]
     return gbTime+flowNumOut
-    
+
+def parseGBHeartbeat(raw:str):
+    pass
+    return ['parseGBHeartbeat Not implemented']
+
 def parseGBDataTemplate(GBDataID,raw):
 
     cmdID = raw[0:2]
@@ -662,7 +666,4 @@ def parseGBPkgs(raw:str):
     elif cmd[0] == '04':
         data += parseGBLogout(raw)
     return data+check
-    
-        
-    
 
