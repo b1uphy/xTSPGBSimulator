@@ -467,8 +467,7 @@ def parseGBData_02(raw):
     raw = raw[4:]
     for i in range(motorCnt):       
         data += parseMotorInfo(raw[0:24])
-        raw = raw[24:]
-        
+        raw = raw[24:]        
     return data
 
 def parseGBData_03(raw):

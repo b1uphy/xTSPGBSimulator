@@ -14,8 +14,9 @@ from queue import Queue
 import base64
 
 # SERVER_IP = '127.0.0.1'
-SERVER_IP = '10.40.166.7'
-SERVER_PORT = 31029             # The same port as used by the server
+SERVER_IP = '218.1.38.234'
+# SERVER_IP = '10.40.166.7'
+SERVER_PORT = 1002             # The same port as used by the server
 
 # SERVER_IP = '10.40.166.8'
 # SERVER_PORT = 9201

@@ -263,7 +263,7 @@ class GBData_01(Field):
                 sum +=GBData_01.Lengths[i]
 
             return fields
-        super(GBData_01,self).__init__('整车数据',raw,convertfunc=convert)
+        super(GBData_01,self).__init__('01 整车数据',raw,convertfunc=convert)
         if xDEBUG:
             print('GBData_01 raw=',raw.hex())
         # keys = 'gbtime,flownum'.split(',')
@@ -367,6 +367,94 @@ class GBData_01(Field):
         unit = '%'
         data = str(value) +'  '+unit
         return data
+class GBData_02(Field):
+    Names = ['驱动电机数量','驱动电机总成信息列表']
+    Lengths = [1,-1]
+    MotorInfoNames = '序号,状态,控制器温度,转速,转矩,温度,控制器输入电压,控制器直流母线电流'.split(',')
+    MotorInfoLengths = [1,1,1,2,2,1,2,2]
+    MotorInfoHandlers = 'MotorNum,MotorStatus,ControllerTemp,MotorSpeed,MotorTorque,MotorTemp,ControllerInputVoltage,ControllerCurrent'.split(',')
+    MotorStatus = {
+    b'\x01':'耗电',
+    b'\x02':'发电',
+    b'\x03':'关闭',
+    b'\x04':'准备',
+    b'\xFE':'异常',
+    b'\xFF':'无效'
+    }
+
+    def __init__(self, raw:bytes):
+        super(GBData_02,self).__init__('02 驱动电机数据',raw,convertfunc=GBData_02.parse)
+        if xDEBUG:
+            print('GBData_02 raw=',raw.hex())
+
+    @staticmethod
+    def parseMotorNum(raw:bytes):
+        return '%02d'%int.from_bytes(raw,'big')
+
+    @staticmethod
+    def parseMotorStatus(raw:bytes):
+        return parseByDct(raw,GBData_02.MotorStatus)
+
+    @staticmethod    
+    def parseControllerTemp(raw:bytes):
+        return parseAnalog(raw,1,-40,'degC')
+
+    @staticmethod   
+    def parseMotorSpeed(raw:bytes):
+        return parseAnalog(raw,1,-20000,'r/min')
+
+    @staticmethod    
+    def parseMotorTorque(raw:bytes):
+        return parseAnalog(raw,0.1,-2000,'N*m')
+
+    @staticmethod    
+    def parseMotorTemp(raw:bytes):
+        return parseAnalog(raw,1,-40,'degC')
+
+    @staticmethod    
+    def parseControllerInputVoltage(raw:bytes):
+        return parseAnalog(raw,0.1,0,'V')
+
+    @staticmethod
+    def parseControllerCurrent(raw:bytes):
+        return parseAnalog(raw,0.1,-1000,'A')
+
+    @staticmethod
+    def parseMotorInfo(raw:bytes):
+        # print('Parse Motor info...')
+        fields = []
+        for name,length,handler in zip(GBData_02.MotorInfoNames,GBData_02.MotorInfoLengths,GBData_02.MotorInfoHandlers):
+            cfunc = eval('GBData_02.parse'+handler)
+            fields.append(Field(name,raw[:length],convertfunc=cfunc))
+
+        if xDEBUG:
+            print('Parse Motor info...')
+            for f in fields:
+                print(f.name,'\t',f.phy)
+
+        return fields
+
+    @staticmethod
+    def parse(raw:bytes):
+        fields = []
+        if xDEBUG:
+            print('cmd02='+raw.hex())
+
+        motorinfolength = sum(GBData_02.MotorInfoLengths)
+        motorCnt = Field('电机数量',raw[0])
+        cnt = int.from_bytes(motorCnt.raw,'big')
+        # print(motorCnt.name,'\t',cnt)        
+        fields.append(motorCnt)
+        raw = raw[1:]
+        cnt = int.from_bytes(motorCnt.raw,'big')
+        for i in range(cnt):
+            # print('init parse motor info')
+            motorInfos = Field('驱动电机 %02d'%(i+1),raw[:motorinfolength],convertfunc=GBData_02.parseMotorInfo)       
+            fields.append(motorInfos)
+            raw = raw[motorinfolength:]
+
+            
+        return fields
 
 class PayloadData(Field):
     def __init__(self, raw:bytes):
@@ -379,9 +467,9 @@ class PayloadData(Field):
                 cat,catdata,raw = splitData(raw)
                 try:
                     fields.append(eval('GBData_%(cat)02d(catdata)'%{'cat':cat}))
-                except:
+                except NameError:
                     if xDEBUG:
-                        print('Need to implenment parseHandler for ',cat)
+                        print('Need to implenment parseHandler for ','GBData_%(cat)02d(catdata)'%{'cat':cat})
             return fields
         super(PayloadData,self).__init__('采集数据',raw,convertfunc=convert)
         # keys = 'cmd,resflg,VIN,secretflg,length'.split(',')
@@ -441,12 +529,15 @@ if __name__ == '__main__':
     msg1 = '232301FE4C4D47464531473030303030303053593101001E1205100B0B30000138393836303631363031303035343538373630310100EC'
     gblogin = OTAGBData(bytes.fromhex(msg1))
 
-    msg2 = b'##\x04\xFELXVJ2GFC2GA030003\x01\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
-    gblogout = OTAGBData(msg2)
+    # msg2 = b'##\x04\xFELXVJ2GFC2GA030003\x01\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
+    # gblogout = OTAGBData(msg2)
 
-    msg3 = '232302FE4C4D47464531473030303030303053593101013512051005223101020301FFFF00000000000007D00002000000FF0002010103000FA043F800000013880501000000000000000006010100000101000001010001010007000000000000000000080101000007D0006000016000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009010100180000000000000000000000000000000000000000000000008F'
-    gbdata = OTAGBData(bytes.fromhex(msg3))
+    # msg3 = '232302FE4C4D47464531473030303030303053593101013512051005223101020301FFFF00000000000007D00002000000FF0002010103000FA043F800000013880501000000000000000006010100000101000001010001010007000000000000000000080101000007D0006000016000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009010100180000000000000000000000000000000000000000000000008F'
+    # gbdata = OTAGBData(bytes.fromhex(msg3))
     
+    msg4 ='232302FE4C58564A3247464332474130323939383401014111091A0F1516010103010000000001220FA0272463010F0870000002020104494E204E20450FAA27060204494E204E16450FB427100501000000000000000006010810540101104001023F01013E070000000000000000000801010FA02724006000016010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010541040104010401040104010401040104010541040104010401040104010541040104010401040105409010100183E3F3E3E3E3E3E3F3F3F3F3E3E3F3F3F3F3F3F3E3E3E3E3FFA'
+    gbdata = OTAGBData(bytes.fromhex(msg4))
+    print('gbdata payload:=',gbdata.payload.raw.hex())
     pass
 
    
