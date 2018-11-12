@@ -1,6 +1,7 @@
 #Echo client program
 #made by bluphy
 #contact @163.com
+# 2018-11-12 14:35:43 by xw: v0.5 Support config file and vehicle history record
 # 2018-10-31 18:24:07 by xw: v0.4 Fix bug txloop does not stopped when model destroied
 # 2018-10-31 15:07:15 by xw: v0.3 supply to get reply msg from server
 # 2018-09-25 16:34:13 by xw: 
@@ -14,10 +15,10 @@ from queue import Queue
 import base64
 
 # SERVER_IP = '127.0.0.1'
-SERVER_IP = '218.1.38.234'
-# SERVER_IP = '10.40.166.7'
-SERVER_PORT = 1002             # The same port as used by the server
 
+SERVER_IP = '10.40.166.7'
+SERVER_PORT = 31029             # The same port as used by the server
+CFGFILE = 'xmonitor.cfg'
 # SERVER_IP = '10.40.166.8'
 # SERVER_PORT = 9201
 
@@ -34,10 +35,9 @@ msg_echo  = "{'name': 'echo', 'data': '' }"
 msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
 #### END## message template
 
-msg_select_vehicle1 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G0000000SY1'} }"
-msg_select_vehicle2 = "{'name': 'select_vehicle', 'data': {'VIN': 'LXVJ2GFC2GA030003'} }"
-msg_select_vehicle3 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G88D1022SY5'} }"
 
+
+xDEBUG = False
 
 def help(cmd=None):
     print('Hello!!')
@@ -46,11 +46,70 @@ class xGBT32960MonitorModel:
     def __init__(self):
         self.txq = Queue()
         self.rxq = Queue()
-        self.configs = {}
-        self.username = ''
-        self.VIN = ''
+        self.configs = {'username':None,'VIN':None,'host':None}
         self.binded = False
+        self.configsHistory = {'userHistory':[],'vhlHistory':[],'hostHistory':[]}
         # self.createSocket()
+        self.loadCfg()
+
+    def loadCfg(self,path=None):
+        if not path: path = ''
+        try:
+            with open(path+CFGFILE,'r') as f:
+                context = None
+                for line in f:
+                    if '[' in line:
+                        context = line.split('[')[1].split(']')[0]
+                        if xDEBUG: print('set config:',context)
+                        continue
+                    else:
+                        pass # context not change
+                    if 'History' in context:
+                        self.configsHistory[context].append(line.strip())
+                    elif 'Last' in context:
+                        name,value = line.strip().split('=')
+                        if name in {'username','VIN','host'}:                        
+                            self.configs[name]=value                        
+                            if xDEBUG: print('configs:',name,value)
+                        else:
+                            print('配置文件信息无效，将使用默认配置')
+                            print('无效配置行:',line)
+        except IOError:
+            print('读取配置文件失败,使用默认值')
+            self.configs['username'] = 'bwtester'
+            self.configs['VIN'] = ''
+            self.configs['host'] = '10.40.166.7:31029'
+
+    def addToHistory(self,name,value):
+        if not value in self.configsHistory[name]:
+            self.configsHistory[name].append(value)
+    def rmFromHistory(self,name,value):
+        try:
+            self.configsHistory[name].remove(value)
+        except KeyError:
+            print('WARNING class',type(self))
+            print('function rmFromHistory:','Not found the specified history item')
+
+    def clearHistory(self,name):
+        try:
+            self.configsHistory[name].clear()
+        except KeyError:
+            print('WARNING class',type(self))
+            print('function clearHistory:','Not found the specified history list')
+
+    def saveCfg(self,path=None):
+        if not path: path = ''
+        try:
+            with open(path+CFGFILE,'w') as f:
+                f.write('[configLast]\n')
+                for name,value in self.configs.items():
+                    f.write('{0}={1}\n'.format(name,value))
+                for name,values in self.configsHistory.items():
+                    f.write('[{}]\n'.format(name))
+                    for e in values:
+                        f.write('{}\n'.format(e))
+        except IOError:
+            print('Save configs fail')
         
     def sendMsg(self,msg:dict):
         '''
@@ -66,6 +125,13 @@ class xGBT32960MonitorModel:
 
     def createSocket(self,serverip=SERVER_IP,serverport=SERVER_PORT):
         print('Connecting to {0}:{1}'.format(serverip,serverport))
+        # if self.configs['host']: #如果模型的host值已经有了，覆盖掉默认值或传入值
+        try:
+            serverip,serverport = self.configs['host'].split(':')
+            serverport = int(serverport,10)
+        except ValueError:
+            pass #use default
+
         self.terminateFlag = False
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.conn = self.s.connect((serverip, serverport))
@@ -110,19 +176,26 @@ class xGBT32960MonitorModel:
                     self.rxq.put(msg)
                     name = msg['name']
                     data = msg['data']
-                    
-                    print(msg,'\n?>',end='')
+                    if name != 'gbdata':
+                        print(msg,'\n?>',end='')
+                    else:
+                        print('Received a GB/T32960 msg','\n?>',end='')
                     # print(gbdata_hndl(data),'\n?>',end='')
         
         print('rx stopped','\n?>',end='')
         
     def closeSocket(self):
-        self.s.close()
-        
+        try:
+            self.s.close()
+        except AttributeError:
+            pass
+
     def destroy(self):
+        
         self.sendMsg(eval(msg_disconnect_vehicle))
         self.sendMsg(eval(msg_logout))
         self.terminateFlag =True
+        self.saveCfg()
         time.sleep(3)
         self.closeSocket()
 
@@ -131,17 +204,22 @@ class xGBT32960MonitorModel:
         if VIN:
             msg['data']['VIN']=VIN
         else:
-            msg['data']['VIN']=self.VIN
+            msg['data']['VIN']=self.configs['VIN']
 
         return msg
     
     def create_msg_login(self):
         msg = eval(msg_login)
-        msg['data']['username']=self.username
+        msg['data']['username']=self.configs['username']
         return msg
 
 
 def main(serverip=SERVER_IP,serverport=SERVER_PORT):
+
+    msg_select_vehicle1 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G0000000SY1'} }"
+    msg_select_vehicle2 = "{'name': 'select_vehicle', 'data': {'VIN': 'LXVJ2GFC2GA030003'} }"
+    msg_select_vehicle3 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G88D1022SY5'} }"
+
     gbm =xGBT32960MonitorModel()
 
     while True:
@@ -180,4 +258,5 @@ def main(serverip=SERVER_IP,serverport=SERVER_PORT):
             help()
 
 if __name__ == '__main__':
+
     main(*sys.argv[1:])

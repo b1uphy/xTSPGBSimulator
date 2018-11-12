@@ -41,6 +41,7 @@ def genGBTime()->bytes:
     gbtime = year+month+date+hour+minute+sec
 
     return gbtime
+
 def splitData(raw:bytes):
     '''
     input raw packets and return a cat and its data
@@ -138,6 +139,13 @@ class Field:
         else:
             self.phy = self.raw.hex()
         pass
+    def printself(self):
+        if isinstance(self.phy, list):
+            for e in self.phy:
+                e.printself()
+        else:
+            print(self.name,self.phy)
+
 class Head(Field):
     def __init__(self, header:bytes):
         #print(header[2])
@@ -187,30 +195,6 @@ class PayloadLogout(Field):
         for i in range(len(keys)):
             exec('self.{0}=self.phy[{1}]'.format(keys[i],i))
 
-# dctGBData_02_MotorStatus = {
-#     '01':'耗电',
-#     '02':'发电',
-#     '03':'关闭',
-#     '04':'准备',
-#     'FE':'异常',
-#     'FF':'无效'
-# }
-
-# dctGBData_05_LocatingStatus_Validation = {
-#     0 : '有效',
-#     1 : '无效'
-# }
-
-# dctGBData_05_LocatingStatus_Latitude = {
-#     0 : '北纬',
-#     1 : '南纬'
-# }
-
-# dctGBData_05_LocatingStatus_Longitude = {
-#     0 : '东经',
-#     1 : '西经'
-# }
-
 
 class GBData_01(Field):
     VehicleStatusDct = {
@@ -250,7 +234,9 @@ class GBData_01(Field):
     Handlers = 'parseVehicleStatus,parseChargingStatus,parseOperatingStatus,parseVehicleSpeed,parseOdometer,parseTotalVoltage,parseTotalCurrent,parseSOC,parseDCDCStatus,parseShift,parseResistence,parseACCPosition,parseBrakePosition'.split(',')
     # Popertys = 
     def __init__(self, raw:bytes):
-        #print(header[2])
+        if xDEBUG:
+            print('GBData_01 raw=',raw.hex())
+
         def convert(raw:bytes):
             fields = []
             sum = 0
@@ -264,8 +250,7 @@ class GBData_01(Field):
 
             return fields
         super(GBData_01,self).__init__('01 整车数据',raw,convertfunc=convert)
-        if xDEBUG:
-            print('GBData_01 raw=',raw.hex())
+
         # keys = 'gbtime,flownum'.split(',')
         # for i in range(len(keys)):
         #     exec('self.{0}=self.phy[{1}]'.format(keys[i],i))
@@ -383,9 +368,11 @@ class GBData_02(Field):
     }
 
     def __init__(self, raw:bytes):
-        super(GBData_02,self).__init__('02 驱动电机数据',raw,convertfunc=GBData_02.parse)
         if xDEBUG:
             print('GBData_02 raw=',raw.hex())
+
+        super(GBData_02,self).__init__('02 驱动电机数据',raw,convertfunc=GBData_02.parse)
+
 
     @staticmethod
     def parseMotorNum(raw:bytes):
@@ -421,7 +408,6 @@ class GBData_02(Field):
 
     @staticmethod
     def parseMotorInfo(raw:bytes):
-        # print('Parse Motor info...')
         fields = []
         for name,length,handler in zip(GBData_02.MotorInfoNames,GBData_02.MotorInfoLengths,GBData_02.MotorInfoHandlers):
             cfunc = eval('GBData_02.parse'+handler)
@@ -442,19 +428,316 @@ class GBData_02(Field):
 
         motorinfolength = sum(GBData_02.MotorInfoLengths)
         motorCnt = Field('电机数量',raw[0])
-        cnt = int.from_bytes(motorCnt.raw,'big')
-        # print(motorCnt.name,'\t',cnt)        
+        cnt = int.from_bytes(motorCnt.raw,'big')      
         fields.append(motorCnt)
         raw = raw[1:]
         cnt = int.from_bytes(motorCnt.raw,'big')
         for i in range(cnt):
-            # print('init parse motor info')
             motorInfos = Field('驱动电机 %02d'%(i+1),raw[:motorinfolength],convertfunc=GBData_02.parseMotorInfo)       
             fields.append(motorInfos)
             raw = raw[motorinfolength:]
-
-            
+      
         return fields
+
+class GBData_05(Field):
+
+    Names = ['定位状态','经度','纬度']
+    Lengths = [1,4,4]
+    Handlers = 'parseLocatingStatus,parseLatitudeLongitude,parseLatitudeLongitude'.split(',')
+
+    LocatingStatus_Validation = {
+        0 : '有效',
+        1 : '无效'
+    }
+
+    LocatingStatus_Latitude = {
+        0 : '北纬',
+        1 : '南纬'
+    }
+
+    LocatingStatus_Longitude = {
+        0 : '东经',
+        1 : '西经'
+    }
+
+    def __init__(self, raw:bytes):
+        if xDEBUG:
+            print('GBData_05 raw=',raw.hex())
+
+        def convert(raw:bytes):
+            fields = []
+            for name,length,handler in zip(GBData_05.Names,GBData_05.Lengths,GBData_05.Handlers):
+                data = raw[:length]
+                raw = raw[length:]
+                cfunc = eval('GBData_05.'+handler)
+                fields.append(Field(name,data,cfunc))
+
+            if xDEBUG:
+                for f in fields:
+                    print(f.name,f.phy)
+            return fields
+        super(GBData_05,self).__init__('05 定位数据',raw,convertfunc=convert)
+
+    
+    @staticmethod
+    def parseLocatingStatus(raw:bytes):
+        if type(raw)==int:
+            value = raw
+        else:
+            value = int.from_bytes(raw,'big')
+        validationMask = 0x1
+        latitudeMask = 0x2
+        longitudeMask = 0x4
+        validation = GBData_05.LocatingStatus_Validation[value & validationMask]
+        latitude = GBData_05.LocatingStatus_Latitude[value & latitudeMask]
+        longitude = GBData_05.LocatingStatus_Longitude[value & longitudeMask]
+        result = ','.join([validation,latitude,longitude])
+       
+        return result
+    
+    @staticmethod
+    def parseLatitudeLongitude(raw:bytes):
+        value = int.from_bytes(raw,'big')/1000000
+        return str(value)+' degC'
+
+class GBData_06(Field):
+    Names = ['最高电压单体:系统号','最高电压单体:序号','最高电压单体:电压值','最低电压单体:系统号','最低电压单体:序号','最低电压单体:电压值',\
+    '最高温度探针:系统号','最高温度探针:序号','最高温度探针:温度值','最低温度探针:系统号','最低温度探针:序号','最低温度探针:温度值']
+    
+    Lengths = [1,1,2,1,1,2,1,1,1,1,1,1]
+    Handlers = 'parseNum,parseNum,parseCellVoltage'.split(',')*2 + 'parseNum,parseNum,parseProbeTemp'.split(',')*2
+    def __init__(self, raw:bytes):
+        if xDEBUG:
+            print('GBData_06 raw=',raw.hex())
+
+        def convert(raw:bytes):
+            fields = []
+            for name,length,handler in zip(GBData_06.Names,GBData_06.Lengths,GBData_06.Handlers):
+                data = raw[:length]
+                raw = raw[length:]
+                cfunc = eval('GBData_06.'+handler)
+                fields.append(Field(name,data,cfunc))
+
+            if xDEBUG:
+                for f in fields:
+                    print(f.name,f.phy)
+            return fields
+        super(GBData_06,self).__init__('06 极值数据',raw,convertfunc=convert)
+
+    @staticmethod
+    def parseNum(raw:bytes):
+        return parseAnalog(raw)
+
+    @staticmethod
+    def parseCellVoltage(raw:bytes):
+        return parseAnalog(raw,0.001,0,'V')
+
+    @staticmethod
+    def parseProbeTemp(raw:bytes):
+        return parseAnalog(raw,1,-40,'degC')
+
+class GBData_07(Field):
+    Names= ['最高报警等级','报警标志位','可充电储能装置故障总数','可充电储能装置故障代码表','驱动电机故障总数','驱动电机故障代码表','发动机故障总数','发送机故障列表','其他故障总数','其他故障代码列表']
+    Lengths=[1,4,1,-1,1,-1,1,-1,1,-1]
+    Handlers='parseMaxAlertLevel,parseAlertFlag'.split(',')+'parseCounts,parseCodeList'.split(',')*4
+    def __init__(self, raw:bytes):
+        if xDEBUG:
+            print('GBData_07 raw=',raw.hex())
+
+        def convert(raw:bytes):
+            fields = []
+            position = 0
+            for name,length,handler in zip(GBData_07.Names,GBData_07.Lengths,GBData_07.Handlers):
+                if length == -1: #-1表示长度可变
+                    length = int.from_bytes(fields[-1].raw,'big')  #长度由上一个字段表示          
+                data = raw[position:position+length]
+                position = position + length
+                cfunc = eval('GBData_07.'+handler)
+                fields.append(Field(name,data,cfunc))
+
+            if xDEBUG:
+                for f in fields:
+                    print(f.name,f.phy)
+            return fields
+        super(GBData_07,self).__init__('07 报警数据',raw,convertfunc=convert)
+
+    @staticmethod
+    def parseMaxAlertLevel(raw:bytes):
+        return parseAnalog(raw)
+
+    @staticmethod
+    def parseAlertFlag(raw:bytes):
+
+        value = int.from_bytes(raw,'big')
+        flagNames = ['温度差异','电池高温','车载储能装置类型过压','车载储能装置类型欠压','SOC低',\
+        '单体电池过压','单体电池欠压','SOC过高','SOC跳变','可充电储能系统不匹配','电池单体一致性差',\
+        '绝缘报警','DCDC温度','制动系统','DCDC状态','驱动电机控制器温度','高压互锁状态','驱动电机温度',\
+        '车载储能装置类型过充']
+        mask = 0x1
+        flagstr = ''
+        for i in range(len(flagNames)):
+            flag = ((mask<<i)&value)>>i
+            if flag ==1: flagstr += ';'+flagNames[i]
+        if value >= 0x80000: 
+            reserved = 'reserve error'
+        else:
+            reserved = 'reserve good'
+
+        if len(flagstr)==0:
+            flagstr = '无故障'
+
+        return flagstr+';'+reserved     
+
+    @staticmethod
+    def parseCounts(raw:bytes):
+        return parseAnalog(raw)
+
+    @staticmethod
+    def parseCodeList(raw:bytes):
+        return 'raw:'+raw.hex()
+
+class GBData_08(Field):
+    Names= ['可充电储能子系统个数','电压信息列表']
+    Lengths=[1,-1]
+    Handlers='parseEnergyStorageSysCnt,parseEnergyStorageVoltageInfoList'.split(',')
+    def __init__(self, raw:bytes):
+        if xDEBUG:
+            print('GBData_08 raw=',raw.hex())
+
+        def convert(raw:bytes):
+            fields = []
+            for name,length,handler in zip(GBData_08.Names,GBData_08.Lengths,GBData_08.Handlers):
+                cfunc = eval('GBData_08.'+handler)
+                if length==-1:
+                    data = raw
+                    fields = fields+cfunc(int.from_bytes(fields[-1].raw,'big'),data)
+                else:
+                    data = raw[:length]
+                    raw = raw[length:]                    
+                    fields.append(Field(name,data,cfunc))
+            return fields
+
+        super(GBData_08,self).__init__('08 电压数据',raw,convertfunc=convert)
+
+    @staticmethod
+    def parseEnergyStorageSysCnt(raw:bytes):
+        return parseAnalog(raw)
+
+    @staticmethod
+    def parseSysVoltage(raw:bytes):
+        return parseAnalog(raw,0.1,0,'V')
+
+    @staticmethod
+    def parseSysCurrent(raw:bytes):
+        return parseAnalog(raw,0.1,-1000,'A') 
+
+    @staticmethod
+    def parseCellVoltage(raw:bytes):
+        return parseAnalog(raw,1,0,'mV')
+
+    @staticmethod        
+    def parseEnergyStorageVoltageInfo(raw):
+        
+        sysNum = Field('系统编号',raw[0:1],convertfunc=parseAnalog)
+        sysVoltage = Field('系统电压',raw[1:3],convertfunc=GBData_08.parseSysVoltage)
+        sysCurrent = Field('系统电流',raw[3:5],convertfunc=GBData_08.parseSysCurrent)
+        cellTotalCnt = Field('单体总数',raw[5:7],convertfunc=parseAnalog)
+        cellThisStartIndex = Field('本帧启始号:',raw[7:9],convertfunc=parseAnalog)
+        
+        cellThisCntText = Field('本帧数量',raw[9:10],convertfunc=parseAnalog)
+        cellVoltageList = GBData_08.parseCellVoltageList(raw[10:])
+        fields =[sysNum, sysVoltage, sysCurrent, cellTotalCnt, cellThisStartIndex, cellThisCntText]+cellVoltageList
+        
+        if xDEBUG:
+            print('Parse Cell Voltage info...')
+            for f in fields:
+                print(f.name,'\t',f.phy)
+
+        return fields
+
+    @staticmethod  
+    def parseCellVoltageList(raw:bytes):
+        fields = []  
+        for i in range(len(raw)//2):
+            fields.append(Field('No.'+str(i+1),raw[0:2],GBData_08.parseCellVoltage))
+            raw = raw[2:]        
+        return fields
+
+    @staticmethod        
+    def parseEnergyStorageVoltageInfoList(sysCnt,raw):
+        fields =[]        
+        for i in range(sysCnt):
+            cellThisCnt = int.from_bytes(raw[9:10],'big')
+            length = 10+2*cellThisCnt
+            data = raw[:length]
+            raw = raw[length:]
+            fields.append(Field('可充电储能子系统序号 %02d'%(i+1),data,GBData_08.parseEnergyStorageVoltageInfo))
+        return fields
+
+class GBData_09(Field):
+    Names= ['可充电储能子系统个数','温度信息列表']
+    Lengths=[1,-1]
+    Handlers='parseEnergyStorageSysCnt,parseEnergyStorageTempInfoList'.split(',')
+    def __init__(self, raw:bytes):
+        if xDEBUG:
+            print('GBData_09 raw=',raw.hex())
+
+        def convert(raw:bytes):
+            fields = []
+            for name,length,handler in zip(GBData_09.Names,GBData_09.Lengths,GBData_09.Handlers):
+                cfunc = eval('GBData_09.'+handler)
+                if length==-1:
+                    data = raw
+                    fields = fields+cfunc(int.from_bytes(fields[-1].raw,'big'),data)
+                else:
+                    data = raw[:length]
+                    raw = raw[length:]                    
+                    fields.append(Field(name,data,cfunc))
+            return fields
+        super(GBData_09,self).__init__('09 温度数据',raw,convertfunc=convert)
+
+    @staticmethod
+    def parseEnergyStorageSysCnt(raw:bytes):
+        return parseAnalog(raw)
+
+    @staticmethod
+    def parseEnergyStorageTempInfoList(sysCnt:int,raw:bytes):
+        fields =[]        
+        for i in range(sysCnt):
+            probeThisCnt = int.from_bytes(raw[1:3],'big')
+            length = 3+probeThisCnt
+            data = raw[:length]
+            raw = raw[length:]
+            fields.append(Field('子系统序号 %02d'%(i+1),data,GBData_09.parseEnergyStorageTempInfo))        
+        return fields    
+
+    @staticmethod
+    def parseEnergyStorageTempInfo(raw:bytes):
+        sysNum = Field('系统编号',raw[0:1],convertfunc=parseAnalog)
+        probeCnt = Field('探针个数',raw[1:3],convertfunc=parseAnalog)
+        probeTempList = GBData_09.parseProbeTempList(raw[3:])
+        fields = [sysNum,probeCnt]+probeTempList
+
+        if xDEBUG:
+            print('Parse Probe Temp info...')
+            for f in fields:
+                print(f.name,'\t',f.phy)
+
+        return fields
+
+
+
+    @staticmethod
+    def parseProbeTempList(raw:bytes):
+        fields = []  
+        for i in range(len(raw)):
+            fields.append(Field('No.'+str(i+1),raw[0:1],GBData_09.parseProbeTemp))
+            raw = raw[1:]        
+        return fields 
+
+    @staticmethod
+    def parseProbeTemp(raw:bytes):
+        return parseAnalog(raw,1,-40,'degC')
 
 class PayloadData(Field):
     def __init__(self, raw:bytes):
@@ -492,8 +775,8 @@ class OTAGBData(Field):
                 payload = cls(msg[24:-1])
                 pass
             except NameError as e:
-                print(e)
-                print('This msg should be heartbeat')
+                # print(e)
+                # print('This msg should be heartbeat')
                 payload = None         
             return [head,payload,chk]
 
@@ -524,6 +807,14 @@ class OTAGBData(Field):
         pass
         return True
 
+def traverseFieldTree(ftree:Field,dojob:'function'=print):
+        if isinstance(ftree.phy,list):
+            for subftree in ftree.phy:
+                traverseFieldTree(subftree,dojob)
+        else:
+            dojob(ftree.phy)
+
+
 if __name__ == '__main__':
 
     msg1 = '232301FE4C4D47464531473030303030303053593101001E1205100B0B30000138393836303631363031303035343538373630310100EC'
@@ -537,7 +828,7 @@ if __name__ == '__main__':
     
     msg4 ='232302FE4C58564A3247464332474130323939383401014111091A0F1516010103010000000001220FA0272463010F0870000002020104494E204E20450FAA27060204494E204E16450FB427100501000000000000000006010810540101104001023F01013E070000000000000000000801010FA02724006000016010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010541040104010401040104010401040104010541040104010401040104010541040104010401040105409010100183E3F3E3E3E3E3E3F3F3F3F3E3E3F3F3F3F3F3F3E3E3E3E3FFA'
     gbdata = OTAGBData(bytes.fromhex(msg4))
-    print('gbdata payload:=',gbdata.payload.raw.hex())
+    gbdata.printself()
     pass
 
    

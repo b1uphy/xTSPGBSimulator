@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-11 15:41:19 by xw: v0.4 support GB data 05,06,07,08,09;08,09 use predefined length
 # 2018-11-10 00:55:17 by xw: v0.3 support GB data 02
 # 2018-11-07 19:20:35 by xw: v0.2 support to monitor GB data 01
 # 2018-09-07 19:42:24 by xw: fix bug when vin contains null character
 # 2018-7-20 11:50:55 by xw: new created.
 #### TODO:
-# 1.实时数据显示部分增加滚动条
+# done 1.实时数据显示部分增加滚动条
 # 2.数据校验助手，提示数据逻辑问题
 # 3.
 # 4.
 
 xDEBUG = False
 
-str_Version = 'v0.3'
+str_Version = 'v0.4'
 str_Title = 'GB大数据监视器'
 
 import sys
@@ -26,35 +27,12 @@ from tkinter.ttk import *
 import socket
 from threading import Thread
 
-from xOTAGBT32960.xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime,Field
-from xOTAGBT32960.GB_PARSER_HANDLER import parseGBPkgs
+from xOTAGBT32960.xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,Field
 from xSigGenerator_GBM import *
 
 COLUMNS = ['数据项名称','值','范围','有效性']
-COLUMNS_WIDTH = [180,200,100,100]
+COLUMNS_WIDTH = [200,200,100,100]
 COLUMNS_STRETCH = [False,True,False,False]
-
-
-def parseGBTime (raw:str):
-    print('gbtime raw=',raw)
-    if not len(raw)==12:         
-        return ['error:GBTime length']
-    else:
-        x=int(raw,16)   
-        maskYear = 0xFF0000000000
-        maskMonth = 0x00FF00000000
-        maskDate = 0x0000FF000000
-        maskHour = 0x000000FF0000
-        maskMin = 0x00000000FF00
-        maskSec = 0x0000000000FF
-        year = str(((x & maskYear) >>40 )+ 2000)
-        month = str((x & maskMonth) >>32)
-        date = str((x & maskDate) >>24)
-        hour = str((x & maskHour) >>16)
-        minute = str((x & maskMin) >>8)
-        sec = str(x & maskSec)
-        return [year+'-'+month+'-'+date+' '+(len(hour)%2)*'0'+hour+':'+(len(minute)%2)*'0'+minute+':'+(len(sec)%2)*'0'+sec]
-
 
 class xGBT32960MonitorView():
     def __init__(self):
@@ -67,7 +45,7 @@ class xGBT32960MonitorView():
         self.frame = Frame(self.root)
         self.frame.grid(row=0,rowspan=1,column=0,columnspan=1,sticky='nesw')
         self.frame.rowconfigure(20,weight=1)
-        self.frame.columnconfigure(20,weight=1)
+        self.frame.columnconfigure(10,weight=1)
 
         self.menubar = Frame(self.frame)
         self.menubar.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
@@ -75,7 +53,8 @@ class xGBT32960MonitorView():
         self.vhlViewFrame = Frame(self.frame)
         self.vhlViewFrame.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         self.vhlViewFrame.rowconfigure(10,weight=1)
-        self.vhlViewFrame.columnconfigure(10,weight=1)
+        # self.vhlViewFrame.columnconfigure(10,weight=1)
+        self.vhlViewFrame.columnconfigure(20,weight=1)
 
         self.vhlInfoFrame = Frame(self.vhlViewFrame)
         self.vhlInfoFrame.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
@@ -83,8 +62,8 @@ class xGBT32960MonitorView():
         self.VINLbl = Label(self.vhlInfoFrame,text='Vehicle')
         self.VINLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         self.VIN = StringVar()
-        self.VINEntry = Entry(self.vhlInfoFrame,textvariable=self.VIN)
-        self.VINEntry.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+        self.VINCombobox = Combobox(self.vhlInfoFrame,textvariable=self.VIN)
+        self.VINCombobox.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
 
         self.bindingActionStrVar = StringVar()
         self.bindingActionStrVar.set('Bind')
@@ -151,20 +130,22 @@ class xGBT32960MonitorView():
         self.vhlRTDataFrame.columnconfigure(10,weight=1)
 
         self.vhlRTDataTree = Treeview(self.vhlRTDataFrame,columns=COLUMNS,show=['tree','headings'])
-        self.vhlRTDataTree.grid(row=10,rowspan=11,column=20,columnspan=1,sticky=N+S+E+W)
+        self.vhlRTDataTree.grid(row=10,rowspan=11,column=10,columnspan=1,sticky=N+S+E+W)
         minwidth = self.vhlRTDataTree.column('#0', option='minwidth')
         self.vhlRTDataTree.column('#0', width=minwidth*2)
-
-        # self.vhlRTDataTree.column(COLUMNS[0], width=180, anchor='e')
-        # self.vhlRTDataTree.column(COLUMNS[1], width=200, anchor='e')
-        # self.vhlRTDataTree.column(COLUMNS[2], width=5, anchor='w')
-        # self.vhlRTDataTree.column(COLUMNS[3], width=5, anchor='w')
-        # self.vhlRTDataTree.column(COLUMNS[4], width=5, anchor='w')
-
+        self.vhlRTDataTree.column(COLUMNS[0], width=COLUMNS_WIDTH[0], anchor='w')
+        self.vhlRTDataTree.column(COLUMNS[1], width=COLUMNS_WIDTH[1], anchor='e')
+        self.vhlRTDataTree.column(COLUMNS[2], width=COLUMNS_WIDTH[2], anchor='e')
+        self.vhlRTDataTree.column(COLUMNS[3], width=COLUMNS_WIDTH[3], anchor='e')
+        # self.vhlRTDataTree.column(COLUMNS[4], width=COLUMNS_WIDTH[4], anchor='e')
         for i in range(len(COLUMNS)):
-            self.vhlRTDataTree.column(COLUMNS[i], width=COLUMNS_WIDTH[i],stretch=COLUMNS_STRETCH[i],anchor='e')
             self.vhlRTDataTree.heading(COLUMNS[i], text=COLUMNS[i])
 
+
+        self.vhlRTDataTreeScrollY = Scrollbar(self.vhlRTDataFrame,orient=VERTICAL,command=self.vhlRTDataTree.yview)
+        self.vhlRTDataTreeScrollY.grid(row=10,rowspan=11, column=20, sticky=N+S)
+
+        self.vhlRTDataTree['yscrollcommand'] = self.vhlRTDataTreeScrollY.set
         # self.logWindow = Text(self.vhlRTDataFrame)
         # self.logWindow.grid(row=10,rowspan=11,column=10,columnspan=1,sticky=N+S+E+W)
 
@@ -182,13 +163,15 @@ class xGBT32960MonitorController():
         self.view.echoBtn.bind('<Button-1>',self.echo)
 
         self.model = xGBT32960MonitorModel()
-        self.setConfig()
-        self.connectTSP(None)
+
+        self.connectTSP()
         self.rxthd = Thread(target=self.rxloop)
         self.rxthd.start()
         self.login(None)
         self.rtViewInitFlag = False
-        self.view.VIN.set('LMGFE1G0000000SY1')
+        self.view.VIN.set(self.model.configs['VIN'])
+        self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
+        self.view.VINCombobox.configure(postcommand=self.updateVINDropDown)
         self.view.root.mainloop()
         
         self.closeflag = True
@@ -198,11 +181,32 @@ class xGBT32960MonitorController():
         time.sleep(0.1)
         self.model = None
 
-    def setConfig(self,*args,**keywors):
-        pass
-        self.model.username = 'ui_tester'
-        self.model.server_ip = SERVER_IP
-        self.model.server_port = SERVER_PORT
+    def updateVINDropDown(self):
+        self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
+    # def setConfigToModel(self,*args,**keywors):
+    #     with open('xmonitor.cfg') as f:
+    #         context = None
+    #         for line in f:
+    #             if '[' in line:
+    #                 context = line.split('[')[1].split(']')[0]
+    #                 if xDEBUG: print('set config:',context)
+    #                 continue
+    #             else:
+    #                 pass # context not change
+    #             if 'History' in context:
+    #                 eval('self.model.{}.append(line.strip())'.format(context))
+    #             elif 'Last' in context:
+    #                 name,value = line.strip().split('=')
+    #                 if name in {'username','VIN','host'}:                        
+    #                     self.model.configs[name]=value                        
+    #                     if xDEBUG: print('configs:',name,value)
+    #                 else:
+    #                     print('配置文件信息无效，将使用默认配置')
+    #                     print('无效配置行:',line)
+
+    #     # self.username = 'default'
+    #     # self.model.VIN = ''
+    #     # self.host =
 
     def getVhlConnectingStatus(self):
         return 'To Be Implement'
@@ -214,9 +218,9 @@ class xGBT32960MonitorController():
             self.view.bindingActionStrVar.set('bind')
         else:
             self.bindVhl(event)
-            self.view.bindingActionStrVar.set('unbind')
+            self.view.bindingActionStrVar.set('unbind')       
 
-    def connectTSP(self,event):      
+    def connectTSP(self):      
         self.model.createSocket()
     
     def login(self,event):
@@ -228,9 +232,10 @@ class xGBT32960MonitorController():
 
     def bindVhl(self,event):
         VIN = self.view.VIN.get().strip().upper()
-        self.model.VIN = VIN
+        self.model.configs['VIN'] = VIN
         self.model.sendMsg(self.model.create_msg_select_vehicle())
         self.model.binded = True
+        self.model.addToHistory('vhlHistory',VIN)
 
     def unbindVhl(self,event):
         self.model.sendMsg(eval(msg_disconnect_vehicle))
@@ -261,6 +266,10 @@ class xGBT32960MonitorController():
         self.view.logoutTime.set(gbobj.payload.gbtime.phy)
 
     def showGBData(self,gbobj):
+        if xDEBUG:
+            print('Class',type(self),'func: showGBData -->')
+            gbobj.printself()
+            
         if not self.rtViewInitFlag:
             self.initRTDataView(gbobj)
 
@@ -270,28 +279,32 @@ class xGBT32960MonitorController():
                 for element in f.phy:
                     if isinstance(element.phy, list):
                         for sube in element.phy:
-                            self.view.vhlRTDataTree.set(element.name+sube.name,column=COLUMNS[1],value=sube.phy)
+                            self.view.vhlRTDataTree.set(f.name+element.name+sube.name,column=COLUMNS[1],value=sube.phy)
                     else:
-                        self.view.vhlRTDataTree.set(element.name,column=COLUMNS[1],value=element.phy)
-                    if xDEBUG: print(element.name,'\t',element.phy)
+                        self.view.vhlRTDataTree.set(f.name+element.name,column=COLUMNS[1],value=element.phy)
+                    # if xDEBUG: print(element.name,'\t',element.phy)
                 #     self.view.vhlRTDataTree.insert(f.name,'end',iid=element.name,values=(element.name,element.phy,'','',''))
             else:
                 self.view.collectTime.set(f.phy)
+
     def showGBT32960Msg(self,gbRaw:bytes):
-        print(gbRaw)
+        if xDEBUG: print(gbRaw)
         gbobj = OTAGBData(gbRaw)
         msgname = gbobj.name
         if msgname==CMD[b'\x01']:
-            if xDEBUG:  print('登入：{}'.format(self.model.VIN))
+            if xDEBUG:  print('登入：{}'.format(self.model.configs['VIN']))
             self.showLogin(gbobj)
         elif msgname==CMD[b'\x04']:
-            if xDEBUG:  print('登出：{}'.format(self.model.VIN))
+            if xDEBUG:  print('登出：{}'.format(self.model.configs['VIN']))
             self.showLogout(gbobj)
-        elif msgname in {CMD[b'\x02'],CMD[b'\x03']}:
-            if xDEBUG:  print('数据：{}'.format(self.model.VIN))
+        elif msgname in {CMD[b'\x02']}:
+            if xDEBUG:  print('数据：{}'.format(self.model.configs['VIN']))
             self.showGBData(gbobj)
+        elif msgname in {CMD[b'\x03']}:
+            if xDEBUG:  print('数据：{}'.format(self.model.configs['VIN']))
+            # self.showGBData(gbobj)
         else:
-            if xDEBUG:  print('其他：{}'.format(self.model.VIN))
+            if xDEBUG:  print('其他：{}'.format(self.model.configs['VIN']))
             print('CMD {}'.format(msgname))
 
     def initRTDataView(self,gbobj):
@@ -301,12 +314,12 @@ class xGBT32960MonitorController():
                 self.view.vhlRTDataTree.item(f.name,open=True)
                 for element in f.phy:
                     if isinstance(element.phy, list):
-                        print('宏域')
-                        self.view.vhlRTDataTree.insert(f.name,'end',iid=element.name,text='',values=(element.name,'','',''),open=True)
+                        if xDEBUG: print('宏域')
+                        self.view.vhlRTDataTree.insert(f.name,'end',iid=f.name+element.name,text='',values=(' '*5+element.name,'','',''),open=True)
                         for sube in element.phy:
-                            self.view.vhlRTDataTree.insert(element.name,'end',iid=element.name+sube.name,text='',values=(sube.name,sube.phy,'',''))
+                            self.view.vhlRTDataTree.insert(f.name+element.name,'end',iid=f.name+element.name+sube.name,text='',values=(' '*13+sube.name,sube.phy,'',''))
                     else:
-                        self.view.vhlRTDataTree.insert(f.name,'end',iid=element.name,text='',values=(element.name,element.phy,'',''))
+                        self.view.vhlRTDataTree.insert(f.name,'end',iid=f.name+element.name,text='',values=(' '*5+element.name,element.phy,'',''))
             else:
                 self.view.collectTime.set(f.phy)
         self.rtViewInitFlag = True
@@ -327,30 +340,6 @@ class xGBT32960MonitorController():
             self.showMsg() #this function will block until get a msg from server
         print('exit Controller rxloop')
 
-    
-# def testDB():
-    # loginmsg = bytes.fromhex('232301FE4C58564433473242364A4130303032303501001E12041B09281F000438393836303631373031303030313335313335370100E7')
-    # logoutmsg = b'##\x01\xFELXVJ2GFC2GA030003\x04\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
-
-    # dbhdl = xdbs.connectdb('borgward_db','borgward', '123456','10.40.166.7',5432)
-    # conn = dbhdl['connection']
-    # cur = dbhdl['cursor']
-    # xdbs.writedb(logoutmsg,time.time(),0,dbhdl)
-
-    # cur.execute("SELECT * FROM gbt32960 WHERE vin='LMGFE1G0000000SY1' LIMIT 10;")
-    # count = 0
-    # for record in cur:
-        # vin = record[0]
-        # msgtime = '采集时间: '+parseGBTime(record[1].tobytes().hex())[0]
-        # systime = '\t系统时间：{0}\traw sec:{1}'.format(time.strftime('%Y-%m-%d %H:%M:%S',time.gmtime(record[2])) ,record[2])
-        # print(vin,msgtime,systime)
-        # count+=1
-        
-    # cur.close()
-    # conn.close()
-    # if count>5:
-        # print('DBtest OK')
-    # return 0
 
 if __name__ == '__main__':
 
