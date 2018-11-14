@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-12 16:30:00 by xw: v0.5.1 add selecting server ui
+# 2018-11-12 14:36:41 by xw: v0.5 support config file and vehicle history record
 # 2018-11-11 15:41:19 by xw: v0.4 support GB data 05,06,07,08,09;08,09 use predefined length
 # 2018-11-10 00:55:17 by xw: v0.3 support GB data 02
 # 2018-11-07 19:20:35 by xw: v0.2 support to monitor GB data 01
@@ -9,15 +11,19 @@
 #### TODO:
 # done 1.实时数据显示部分增加滚动条
 # 2.数据校验助手，提示数据逻辑问题
-# 3.
-# 4.
+# 3.优化初始窗口大小
+# 4.增加服务器选择界面及服务器历史记录
+# 5.增加用户登入界面
+# 6.分割应用层与TCP层
+# 7.增加支持 TLS1.2协议与服务器通讯
+# 8.增加log记录功能
 
 xDEBUG = False
 
-str_Version = 'v0.4'
+str_Version = 'v0.5.1'
 str_Title = 'GB大数据监视器'
 
-import sys
+import sys,os,ctypes
 sys.path.append(sys.path[0].rsplit('\\',1)[0])
 print(sys.path)
 # import xDBService.xDBService as xdbs
@@ -27,6 +33,13 @@ from tkinter.ttk import *
 import socket
 from threading import Thread
 
+user32 = ctypes.windll.user32
+screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+
+xWIDTH = int(screensize[0]//10*6)
+xHEIGHT = int(screensize[1]//10*8)
+OFFSET_X = 300
+OFFSET_Y = 100
 from xOTAGBT32960.xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,Field
 from xSigGenerator_GBM import *
 
@@ -41,6 +54,9 @@ class xGBT32960MonitorView():
         self.root.rowconfigure(0, weight=1)
         self.root.title(str_Title +' '+ str_Version)
         self.root.grid()
+        self.root.minsize(xWIDTH, 600)
+        goemtrystr = '{0}x{1}+{2}+{3}'.format(xWIDTH,xHEIGHT,OFFSET_X,OFFSET_Y)
+        self.root.geometry(goemtrystr)
 
         self.frame = Frame(self.root)
         self.frame.grid(row=0,rowspan=1,column=0,columnspan=1,sticky='nesw')
@@ -53,11 +69,21 @@ class xGBT32960MonitorView():
         self.vhlViewFrame = Frame(self.frame)
         self.vhlViewFrame.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         self.vhlViewFrame.rowconfigure(10,weight=1)
-        # self.vhlViewFrame.columnconfigure(10,weight=1)
         self.vhlViewFrame.columnconfigure(20,weight=1)
 
         self.vhlInfoFrame = Frame(self.vhlViewFrame)
         self.vhlInfoFrame.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.hostLbl = Label(self.vhlInfoFrame,text='Server')
+        self.hostLbl.grid(row=5,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.host = StringVar()
+        self.hostCombobox = Combobox(self.vhlInfoFrame,textvariable=self.host)
+        self.hostCombobox.grid(row=5,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+
+        self.connectingActionStrVar = StringVar()
+        self.connectingActionStrVar.set('Connect')        
+        self.toggleConnectingBtn = Button(self.vhlInfoFrame,textvariable=self.connectingActionStrVar)
+        self.toggleConnectingBtn.grid(row=5,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
 
         self.VINLbl = Label(self.vhlInfoFrame,text='Vehicle')
         self.VINLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
@@ -66,13 +92,14 @@ class xGBT32960MonitorView():
         self.VINCombobox.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
 
         self.bindingActionStrVar = StringVar()
-        self.bindingActionStrVar.set('Bind')
-        
+        self.bindingActionStrVar.set('Bind')        
         self.toggleBindingBtn = Button(self.vhlInfoFrame,textvariable=self.bindingActionStrVar)
         self.toggleBindingBtn.grid(row=10,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
+        self.toggleBindingBtn.state(["disabled"])
 
         self.echoBtn = Button(self.vhlInfoFrame,text='echo')
         self.echoBtn.grid(row=20,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
+        self.echoBtn.state(["disabled"])
 
         self.vhlLoggingInfoFrame = Frame(self.vhlInfoFrame)
         self.vhlLoggingInfoFrame.grid(row=30,rowspan=1,column=10,columnspan=21,sticky=N+S+E+W)
@@ -153,25 +180,34 @@ class xGBT32960MonitorView():
         self.status.set('Hello')
         self.statusbar = Label(self.frame,textvariable=self.status)
         self.statusbar.grid(row=30,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
-
+        self.statusbar.bind('<Triple-Button-1>',self.clearStatusBar)
+    
+    def clearStatusBar(self,event):
+        self.status.set('')
 class xGBT32960MonitorController():
     def __init__(self):
         self.closeflag = False
 
-        self.view = xGBT32960MonitorView()        
-        self.view.toggleBindingBtn.bind('<Button-1>',self.toggleBinding)
-        self.view.echoBtn.bind('<Button-1>',self.echo)
+        self.view = xGBT32960MonitorView()
 
         self.model = xGBT32960MonitorModel()
 
-        self.connectTSP()
-        self.rxthd = Thread(target=self.rxloop)
-        self.rxthd.start()
-        self.login(None)
-        self.rtViewInitFlag = False
+        self.view.toggleConnectingBtn.bind('<Button-1>',self.toggleConnecting)
+        self.view.toggleBindingBtn.bind('<Button-1>',self.toggleBinding)
+        self.view.echoBtn.bind('<Button-1>',self.echo)
+
+        self.view.host.set(self.model.configs['host'])
+        self.view.hostCombobox.configure(values=self.model.configsHistory['hostHistory'])
+        self.view.hostCombobox.configure(postcommand=self.updateHostDropDown)
+        
+        self.rxthdExist = False #接收消息的线程是否启动的标记量
+
+        self.rtViewInitFlag = False #实时信息显示窗数据项目初始化标记
+
         self.view.VIN.set(self.model.configs['VIN'])
         self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
         self.view.VINCombobox.configure(postcommand=self.updateVINDropDown)
+
         self.view.root.mainloop()
         
         self.closeflag = True
@@ -181,70 +217,98 @@ class xGBT32960MonitorController():
         time.sleep(0.1)
         self.model = None
 
+    def updateHostDropDown(self):
+        self.view.hostCombobox.configure(values=self.model.configsHistory['hostHistory'])
+
     def updateVINDropDown(self):
         self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
-    # def setConfigToModel(self,*args,**keywors):
-    #     with open('xmonitor.cfg') as f:
-    #         context = None
-    #         for line in f:
-    #             if '[' in line:
-    #                 context = line.split('[')[1].split(']')[0]
-    #                 if xDEBUG: print('set config:',context)
-    #                 continue
-    #             else:
-    #                 pass # context not change
-    #             if 'History' in context:
-    #                 eval('self.model.{}.append(line.strip())'.format(context))
-    #             elif 'Last' in context:
-    #                 name,value = line.strip().split('=')
-    #                 if name in {'username','VIN','host'}:                        
-    #                     self.model.configs[name]=value                        
-    #                     if xDEBUG: print('configs:',name,value)
-    #                 else:
-    #                     print('配置文件信息无效，将使用默认配置')
-    #                     print('无效配置行:',line)
-
-    #     # self.username = 'default'
-    #     # self.model.VIN = ''
-    #     # self.host =
 
     def getVhlConnectingStatus(self):
         return 'To Be Implement'
 
     def toggleBinding(self,event):
-        print('toggle function')
-        if self.model.binded:
-            self.unbindVhl(event)
-            self.view.bindingActionStrVar.set('bind')
-        else:
-            self.bindVhl(event)
-            self.view.bindingActionStrVar.set('unbind')       
+        print('function toggle binding')
+        if self.model.connected:
+            if self.model.binded:
+                self.unbindVhl()                
+            else:
+                self.bindVhl()
+                
+    def toggleConnecting(self,event):
+        print('function toggle connecting')
+        if self.model.connected: # 连接 -> 断开连接
+            self.model.connected = False
+            print('disconnect TSP1')
+            self.toggleBtnState()           
+            self.disconnectTSP()
+            self.view.connectingActionStrVar.set('Connect')
+            
+        else: # 断开连接 -> 连接
+            result = self.connectTSP()
+            if 0==result: 
+                self.view.connectingActionStrVar.set('Disconnect')
+                self.toggleBtnState()
+            else:
+                self.view.status.set('ERROR: 无法连接到服务器')
 
-    def connectTSP(self):      
-        self.model.createSocket()
-    
-    def login(self,event):
+    def toggleBtnState(self):
+        print('disconnect TSP2')
+        if self.model.connected:
+            self.view.toggleBindingBtn.state(['!disabled'])
+            self.view.echoBtn.state(['!disabled'])
+        else:
+            self.view.toggleBindingBtn.state(['disabled'])
+            self.view.echoBtn.state(['disabled'])
+
+    def disconnectTSP(self):
+        self.logout()
+        self.rxthdExist = False
+
+    def connectTSP(self):
+        self.view.status.set('INFO: 正在连接服务器')
+        time.sleep(0.1)
+        host = self.view.host.get().strip()
+        self.model.configs['host'] = host      
+        result = self.model.createSocket()
+        if 0==result:
+            self.model.addToHistory('hostHistory',host)
+
+            self.rxthdExist =True
+            self.rxthd = Thread(target=self.rxloop)
+            self.rxthd.start()
+
+            self.login()
+
+        return result
+
+
+    def login(self):
         self.model.sendMsg(self.model.create_msg_login())
 
     def echo(self,event):
-        self.model.sendMsg(eval(msg_echo))
-        self.view.status.set('echo')
+        if self.model.connected:
+            self.model.sendMsg(eval(msg_echo))
+            self.view.status.set('echo')
 
-    def bindVhl(self,event):
+    def bindVhl(self):
         VIN = self.view.VIN.get().strip().upper()
         self.model.configs['VIN'] = VIN
         self.model.sendMsg(self.model.create_msg_select_vehicle())
         self.model.binded = True
         self.model.addToHistory('vhlHistory',VIN)
+        self.view.bindingActionStrVar.set('Unbind') 
 
-    def unbindVhl(self,event):
+    def unbindVhl(self):
         self.model.sendMsg(eval(msg_disconnect_vehicle))
         self.model.binded = False
         self.clearView()
+        self.view.bindingActionStrVar.set('Bind')
 
-    def logout(self,event):
+    def logout(self):
+        if self.model.binded:
+            self.unbindVhl()
         self.model.destroy()
-        self.model=None
+        # self.model=None
 
     def showMsg(self):
         msg = self.model.rxq.get()
@@ -275,15 +339,13 @@ class xGBT32960MonitorController():
 
         for f in gbobj.payload.phy:
             if f.name != '采集时间':
-                # self.view.vhlRTDataTree.insert('','end',iid=f.name,values=(f.name,'','','',''))
+
                 for element in f.phy:
                     if isinstance(element.phy, list):
                         for sube in element.phy:
                             self.view.vhlRTDataTree.set(f.name+element.name+sube.name,column=COLUMNS[1],value=sube.phy)
                     else:
                         self.view.vhlRTDataTree.set(f.name+element.name,column=COLUMNS[1],value=element.phy)
-                    # if xDEBUG: print(element.name,'\t',element.phy)
-                #     self.view.vhlRTDataTree.insert(f.name,'end',iid=element.name,values=(element.name,element.phy,'','',''))
             else:
                 self.view.collectTime.set(f.phy)
 
@@ -336,8 +398,13 @@ class xGBT32960MonitorController():
         self.view.collectTime.set('')
 
     def rxloop(self):
-        while not self.closeflag:            
-            self.showMsg() #this function will block until get a msg from server
+        while (not self.closeflag) and self.rxthdExist:
+            self.model.rxMsg()
+            try:           
+                self.showMsg() #this function will block until get a msg from server
+            except Exception as e:
+                print(e)
+                print('WARNING:','Can not show msg to ui')
         print('exit Controller rxloop')
 
 

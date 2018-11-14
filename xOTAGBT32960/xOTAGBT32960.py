@@ -8,7 +8,7 @@ from bidict import bidict
 
 xDEBUG = False
 
-CMD = bidict({
+CMD = {
     b'\x01' : '车辆登入',    
     b'\x02' : '实时数据',    
     b'\x03' : '补发数据',    
@@ -17,7 +17,7 @@ CMD = bidict({
     b'\x80' : '查询命令',    
     b'\x81' : '设置命令',   
     b'\x82' : '控制命令'
-    })
+    }
 
 GBDataLengths = [21,-1,-1,6,10,15,-1,-1,-1]
 
@@ -842,4 +842,4 @@ if __name__ == '__main__':
 
     print(createOTAGBMsg(b'\x01', b'\xFE', 'LXVJ2GFC2GA030003', 1, 7, genGBTime() ))
 
-    print(createOTAGBMsg(CMD.inv['心跳'], b'\x01', 'LXVJ2GFC2GA030003', 1, 0, b''))
+    print(createOTAGBMsg(b'\x07', b'\x01', 'LXVJ2GFC2GA030003', 1, 0, b''))
