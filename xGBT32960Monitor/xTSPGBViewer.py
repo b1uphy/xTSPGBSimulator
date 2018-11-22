@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-22 18:17:36 by xw: v0.5.2 support log view to show raw data
 # 2018-11-12 16:30:00 by xw: v0.5.1 add selecting server ui
 # 2018-11-12 14:36:41 by xw: v0.5 support config file and vehicle history record
 # 2018-11-11 15:41:19 by xw: v0.4 support GB data 05,06,07,08,09;08,09 use predefined length
@@ -17,6 +18,8 @@
 # 6.分割应用层与TCP层
 # 7.增加支持 TLS1.2协议与服务器通讯
 # 8.增加log记录功能
+# 9.增加本地数据库，支持数据库检索功能
+# 10.支持远程数据库检索功能
 
 xDEBUG = False
 
@@ -157,7 +160,7 @@ class xGBT32960MonitorView():
         self.vhlRTDataFrame.columnconfigure(10,weight=1)
 
         self.vhlRTDataTree = Treeview(self.vhlRTDataFrame,columns=COLUMNS,show=['tree','headings'])
-        self.vhlRTDataTree.grid(row=10,rowspan=11,column=10,columnspan=1,sticky=N+S+E+W)
+        self.vhlRTDataTree.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         minwidth = self.vhlRTDataTree.column('#0', option='minwidth')
         self.vhlRTDataTree.column('#0', width=minwidth*2)
         self.vhlRTDataTree.column(COLUMNS[0], width=COLUMNS_WIDTH[0], anchor='w')
@@ -169,12 +172,20 @@ class xGBT32960MonitorView():
             self.vhlRTDataTree.heading(COLUMNS[i], text=COLUMNS[i])
 
 
+
         self.vhlRTDataTreeScrollY = Scrollbar(self.vhlRTDataFrame,orient=VERTICAL,command=self.vhlRTDataTree.yview)
-        self.vhlRTDataTreeScrollY.grid(row=10,rowspan=11, column=20, sticky=N+S)
+        self.vhlRTDataTreeScrollY.grid(row=10,rowspan=1, column=20, sticky=N+S)
 
         self.vhlRTDataTree['yscrollcommand'] = self.vhlRTDataTreeScrollY.set
         # self.logWindow = Text(self.vhlRTDataFrame)
         # self.logWindow.grid(row=10,rowspan=11,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.logText = Text(self.vhlRTDataFrame)
+        self.logText.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+
+        self.logTextScrollY = Scrollbar(self.vhlRTDataFrame,orient=VERTICAL,command=self.logText.yview)
+        self.logTextScrollY.grid(row=20,rowspan=1, column=20, sticky=N+S)
+        self.logText['yscrollcommand'] = self.logTextScrollY.set
 
         self.status = StringVar()
         self.status.set('Hello')
@@ -353,6 +364,8 @@ class xGBT32960MonitorController():
         if xDEBUG: print(gbRaw)
         gbobj = OTAGBData(gbRaw)
         msgname = gbobj.name
+        self.view.logText.insert(END,gbobj.raw.hex()+'\n')
+        self.view.logText.see(END)
         if msgname==CMD[b'\x01']:
             if xDEBUG:  print('登入：{}'.format(self.model.configs['VIN']))
             self.showLogin(gbobj)

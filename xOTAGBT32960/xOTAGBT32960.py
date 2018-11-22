@@ -4,8 +4,6 @@
 # 2018-11-19 18:26:35 by xw: fixed a bug when analyzing GB Data 02
 # 2018-5-29 17:06:51 by xw: new created.
 import time
-from bidict import bidict
-# import xTSPGBSimulator.xOTAGBT32960.GB_PARSER_HANDLER as gbp
 
 xDEBUG = False
 

@@ -6,7 +6,7 @@
 
 #### BEGIN Calibration
 OPTIONS = {
-	'server': 'http://192.168.1.19:8080',
+	'server': 'http://10.40.166.3:8080',
 	}
 USERNAME = 'Test1'
 PASSWORD = '123456'
