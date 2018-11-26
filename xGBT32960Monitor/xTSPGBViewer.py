@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-26 16:43:27 by xw: v0.5.6 fix bug when clear view, the heartbeat time is not cleared
 # 2018-11-26 16:21:12 by xw: v0.5.5 fix bug for pyinstaller distributed exe file when loading icon 
 # 2018-11-26 14:56:00 by xw: v0.5.4 change the default app icon to eks
 # 2018-11-26 13:11:20 by xw: v0.5.3 support to show the rx time of heartbeat msg
@@ -26,7 +27,7 @@
 
 xDEBUG = False
 
-str_Version = 'v0.5.5'
+str_Version = 'v0.5.6'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
@@ -430,6 +431,7 @@ class xGBT32960MonitorController():
         self.view.loginTime.set('')
         self.view.logoutTime.set('')
         self.view.collectTime.set('')
+        self.view.heartbeatTime.set('')
 
     def rxloop(self):
         while (not self.closeflag) and self.rxthdExist:
