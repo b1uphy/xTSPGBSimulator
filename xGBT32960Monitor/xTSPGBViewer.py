@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-26 14:56:00 by xw: v0.5.4 change the default app icon to eks
 # 2018-11-26 13:11:20 by xw: v0.5.3 support to show the rx time of heartbeat msg
 # 2018-11-22 18:17:36 by xw: v0.5.2 support log view to show raw data
 # 2018-11-12 16:30:00 by xw: v0.5.1 add selecting server ui
@@ -24,7 +25,7 @@
 
 xDEBUG = False
 
-str_Version = 'v0.5.3'
+str_Version = 'v0.5.4'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes
@@ -57,6 +58,7 @@ class xGBT32960MonitorView():
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         self.root.title(str_Title +' '+ str_Version)
+        self.root.iconbitmap(r'eks_32x32.ico')
         self.root.grid()
         self.root.minsize(xWIDTH, 600)
         goemtrystr = '{0}x{1}+{2}+{3}'.format(xWIDTH,xHEIGHT,OFFSET_X,OFFSET_Y)
