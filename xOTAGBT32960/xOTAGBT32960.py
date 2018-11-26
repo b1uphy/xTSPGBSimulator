@@ -41,6 +41,16 @@ def genGBTime()->bytes:
 
     return gbtime
 
+def timestamp()->str:
+    lct = time.localtime()
+    year = lct.tm_year
+    month = lct.tm_mon
+    date = lct.tm_mday
+    hour = lct.tm_hour
+    minute = lct.tm_min
+    sec = lct.tm_sec
+    return '%d-%02d-%02d %02d:%02d:%02d'%(year,month,date,hour,minute,sec)
+
 def splitData(raw:bytes):
     '''
     input raw packets and return a cat and its data
@@ -142,7 +152,10 @@ class Field:
         if isinstance(self.phy, list):
             print(self.name,'raw:',self.raw.hex())
             for e in self.phy:
-                e.printself()
+                try:
+                    e.printself()
+                except AttributeError:
+                    pass
         else:
             print(self.name,self.phy,'raw:',self.raw.hex())
 
@@ -194,7 +207,6 @@ class PayloadLogout(Field):
         keys = 'gbtime,flownum'.split(',')
         for i in range(len(keys)):
             exec('self.{0}=self.phy[{1}]'.format(keys[i],i))
-
 
 class GBData_01(Field):
     VehicleStatusDct = {
@@ -777,7 +789,8 @@ class OTAGBData(Field):
             except NameError as e:
                 # print(e)
                 # print('This msg should be heartbeat')
-                payload = None         
+                payload = None
+
             return [head,payload,chk]
 
         super(OTAGBData,self).__init__('GBT32960',msg,convertfunc=convert)
@@ -819,6 +832,8 @@ if __name__ == '__main__':
 
     msg1 = '232301FE4C4D47464531473030303030303053593101001E1205100B0B30000138393836303631363031303035343538373630310100EC'
     gblogin = OTAGBData(bytes.fromhex(msg1))
+    tmp = bytes.fromhex(msg1)[2:-1]
+    print(tmp)
 
     # msg2 = b'##\x04\xFELXVJ2GFC2GA030003\x01\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
     # gblogout = OTAGBData(msg2)
@@ -827,20 +842,25 @@ if __name__ == '__main__':
     # gbdata = OTAGBData(bytes.fromhex(msg3))
     
     # msg4 ='232302FE4C58564A3247464332474130323939383401014111091A0F1516010103010000000001220FA0272463010F0870000002020104494E204E20450FAA27060204494E204E16450FB427100501000000000000000006010810540101104001023F01013E070000000000000000000801010FA02724006000016010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010541040104010401040104010401040104010541040104010401040104010541040104010401040105409010100183E3F3E3E3E3E3E3F3F3F3F3E3E3F3F3F3F3F3F3E3E3E3E3FFA'
-    msg4 =''.join('23 23 02 FE 4C 4D 47 46 45 31 47 30 30 30 30 30 30 30 53 59 31 01 01 41 12 0B 13 11 1A 23 01 02 03 01 FF FF 00 00 00 00 00 00 07 D0 00 02 00 00 00 FF 00 02 02 01 03 00 0F A0 43 F8 00 00 00 13 88 02 03 00 0F A0 43 F8 00 00 00 13 88 05 01 00 00 00 00 00 00 00 00 06 01 01 00 00 01 01 00 00 01 01 00 01 01 00 07 00 00 00 00 00 00 00 00 00 08 01 01 00 00 07 D0 00 60 00 01 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 09 01 01 00 18 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 45'.split())
-    gbdata = OTAGBData(bytes.fromhex(msg4))
-    gbdata.printself()
-    pass
+    # msg4 =''.join('23 23 02 FE 4C 4D 47 46 45 31 47 30 30 30 30 30 30 30 53 59 31 01 01 41 12 0B 13 11 1A 23 01 02 03 01 FF FF 00 00 00 00 00 00 07 D0 00 02 00 00 00 FF 00 02 02 01 03 00 0F A0 43 F8 00 00 00 13 88 02 03 00 0F A0 43 F8 00 00 00 13 88 05 01 00 00 00 00 00 00 00 00 06 01 01 00 00 01 01 00 00 01 01 00 01 01 00 07 00 00 00 00 00 00 00 00 00 08 01 01 00 00 07 D0 00 60 00 01 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 09 01 01 00 18 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 45'.split())
+    # gbdata = OTAGBData(bytes.fromhex(msg4))
+    # gbdata.printself()
+    # pass
 
-   
-    tmp = bytes.fromhex(msg1)[2:-1]
-    print(tmp)
+    msg5 = createOTAGBMsg(b'\x07', b'\x01', 'LXVJ2GFC2GA030003', 1, 0, b'')
+    gbheartbeat = OTAGBData(msg5)
+    gbheartbeat.printself()
+    print(gbheartbeat.name)
+
+
+    print(timestamp())
+
     
-    chk = calBCCChk(tmp)
-    print('chk=',chk.hex())
+    # chk = calBCCChk(tmp)
+    # print('chk=',chk.hex())
 
-    print('gbtime=',parseGBTime((genGBTime())))
+    # print('gbtime=',parseGBTime((genGBTime())))
 
-    print(createOTAGBMsg(b'\x01', b'\xFE', 'LXVJ2GFC2GA030003', 1, 7, genGBTime() ))
+    # print(createOTAGBMsg(b'\x01', b'\xFE', 'LXVJ2GFC2GA030003', 1, 7, genGBTime() ))
 
-    print(createOTAGBMsg(b'\x07', b'\x01', 'LXVJ2GFC2GA030003', 1, 0, b''))
+    # print(createOTAGBMsg(b'\x07', b'\x01', 'LXVJ2GFC2GA030003', 1, 0, b''))

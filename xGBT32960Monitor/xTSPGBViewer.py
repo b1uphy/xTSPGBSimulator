@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-26 13:11:20 by xw: v0.5.3 support to show the rx time of heartbeat msg
 # 2018-11-22 18:17:36 by xw: v0.5.2 support log view to show raw data
 # 2018-11-12 16:30:00 by xw: v0.5.1 add selecting server ui
 # 2018-11-12 14:36:41 by xw: v0.5 support config file and vehicle history record
@@ -23,7 +24,7 @@
 
 xDEBUG = False
 
-str_Version = 'v0.5.1'
+str_Version = 'v0.5.3'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes
@@ -43,7 +44,7 @@ xWIDTH = int(screensize[0]//10*6)
 xHEIGHT = int(screensize[1]//10*8)
 OFFSET_X = 300
 OFFSET_Y = 100
-from xOTAGBT32960.xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,Field
+from xOTAGBT32960.xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,Field,timestamp
 from xSigGenerator_GBM import *
 
 COLUMNS = ['数据项名称','值','范围','有效性']
@@ -147,6 +148,12 @@ class xGBT32960MonitorView():
         self.collectTimeValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.collectTime)
         self.collectTimeValueLbl.grid(row=30,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
 
+        self.heartbeatTime = StringVar()
+        self.heartbeatLbl = Label(self.vhlLoggingInfoFrame,text='心跳报文:')
+        self.heartbeatLbl.grid(row=40,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
+        self.heartbeatValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.heartbeatTime)
+        self.heartbeatValueLbl.grid(row=40,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
+
 
         self.msgListFrame = Frame(self.vhlViewFrame)
         self.msgListFrame.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
@@ -195,6 +202,7 @@ class xGBT32960MonitorView():
     
     def clearStatusBar(self,event):
         self.status.set('')
+        
 class xGBT32960MonitorController():
     def __init__(self):
         self.closeflag = False
@@ -340,6 +348,9 @@ class xGBT32960MonitorController():
         self.view.logoutFlownum.set(gbobj.payload.flownum.phy)
         self.view.logoutTime.set(gbobj.payload.gbtime.phy)
 
+    def showHeartBeat(self,gbobj):
+        self.view.heartbeatTime.set(timestamp())
+
     def showGBData(self,gbobj):
         if xDEBUG:
             print('Class',type(self),'func: showGBData -->')
@@ -378,6 +389,9 @@ class xGBT32960MonitorController():
         elif msgname in {CMD[b'\x03']}:
             if xDEBUG:  print('数据：{}'.format(self.model.configs['VIN']))
             # self.showGBData(gbobj)
+        elif msgname in {CMD[b'\x07']}:
+            if xDEBUG:  print('数据：{}'.format(self.model.configs['VIN']))
+            self.showHeartBeat(gbobj)
         else:
             if xDEBUG:  print('其他：{}'.format(self.model.configs['VIN']))
             print('CMD {}'.format(msgname))
