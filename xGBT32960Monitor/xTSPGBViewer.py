@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-11-26 16:21:12 by xw: v0.5.5 fix bug for pyinstaller distributed exe file when loading icon 
 # 2018-11-26 14:56:00 by xw: v0.5.4 change the default app icon to eks
 # 2018-11-26 13:11:20 by xw: v0.5.3 support to show the rx time of heartbeat msg
 # 2018-11-22 18:17:36 by xw: v0.5.2 support log view to show raw data
@@ -25,18 +26,21 @@
 
 xDEBUG = False
 
-str_Version = 'v0.5.4'
+str_Version = 'v0.5.5'
 str_Title = 'GB大数据监视器'
 
-import sys,os,ctypes
+import sys,os,ctypes,socket,time
 sys.path.append(sys.path[0].rsplit('\\',1)[0])
 print(sys.path)
 # import xDBService.xDBService as xdbs
-import time
 from tkinter import *
 from tkinter.ttk import *
-import socket
 from threading import Thread
+
+#import icon resource
+import base64,eks
+with open('tmpicon.ico','wb+') as tmp:
+    tmp.write(base64.b64decode(eks.img))
 
 user32 = ctypes.windll.user32
 screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
@@ -45,7 +49,7 @@ xWIDTH = int(screensize[0]//10*6)
 xHEIGHT = int(screensize[1]//10*8)
 OFFSET_X = 300
 OFFSET_Y = 100
-from xOTAGBT32960.xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,Field,timestamp
+from xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,Field,timestamp
 from xSigGenerator_GBM import *
 
 COLUMNS = ['数据项名称','值','范围','有效性']
@@ -58,7 +62,8 @@ class xGBT32960MonitorView():
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         self.root.title(str_Title +' '+ str_Version)
-        self.root.iconbitmap(r'eks_32x32.ico')
+        self.root.iconbitmap(r'tmpicon.ico')
+        os.remove('tmpicon.ico') 
         self.root.grid()
         self.root.minsize(xWIDTH, 600)
         goemtrystr = '{0}x{1}+{2}+{3}'.format(xWIDTH,xHEIGHT,OFFSET_X,OFFSET_Y)
