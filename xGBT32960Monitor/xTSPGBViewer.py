@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-12-03 12:04:13 by xw: v0.5.7 Add support of showing energy storage system info when login
 # 2018-11-26 16:43:27 by xw: v0.5.6 fix bug when clear view, the heartbeat time is not cleared
 # 2018-11-26 16:21:12 by xw: v0.5.5 fix bug for pyinstaller distributed exe file when loading icon 
 # 2018-11-26 14:56:00 by xw: v0.5.4 change the default app icon to eks
@@ -25,14 +26,14 @@
 # 9.增加本地数据库，支持数据库检索功能
 # 10.支持远程数据库检索功能
 
-xDEBUG = False
+xDEBUG = True
 
-str_Version = 'v0.5.6'
+str_Version = 'v0.5.7'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
-sys.path.append(sys.path[0].rsplit('\\',1)[0])
-print(sys.path)
+# sys.path.append(sys.path[0].rsplit('\\',1)[0])
+# print(sys.path)
 # import xDBService.xDBService as xdbs
 from tkinter import *
 from tkinter.ttk import *
@@ -160,8 +161,38 @@ class xGBT32960MonitorView():
         self.heartbeatLbl = Label(self.vhlLoggingInfoFrame,text='心跳报文:')
         self.heartbeatLbl.grid(row=40,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
         self.heartbeatValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.heartbeatTime)
-        self.heartbeatValueLbl.grid(row=40,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
+        self.heartbeatValueLbl.grid(row=40,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W) 
 
+        self.LoginInfoFrame = Frame(self.vhlInfoFrame)
+        self.LoginInfoFrame.grid(row=40,rowspan=1,column=10,columnspan=21,sticky=N+S+E+W)
+        self.LoginInfoFrame.rowconfigure(10,weight=1)
+        self.LoginInfoFrame.rowconfigure(10,weight=1)
+        self.LoginInfoFrame.columnconfigure(10,weight=1)
+        self.LoginInfoFrame.columnconfigure(20,weight=1)
+
+        self.ICCID = StringVar()
+        self.ICCIDLabel = Label(self.LoginInfoFrame,text='ICCID')
+        self.ICCIDLabel.grid(row=5,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.ICCIDValueLabel = Label(self.LoginInfoFrame,textvariable=self.ICCID)
+        self.ICCIDValueLabel.grid(row=6,rowspan=1,column=10,columnspan=21,sticky=N+S+E+W)
+
+        self.energyStorageSysCnt = StringVar()
+        self.energyStorageSysCntLbl = Label(self.LoginInfoFrame,text='可充电储能子系统数')
+        self.energyStorageSysCntLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.energyStorageSysCntValueLbl = Label(self.LoginInfoFrame,textvariable=self.energyStorageSysCnt)
+        self.energyStorageSysCntValueLbl.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+
+        self.energyStorageSysCodeLen = StringVar()
+        self.energyStorageSysCodeLenLbl = Label(self.LoginInfoFrame,text='可充电储能子系统编码长度')
+        self.energyStorageSysCodeLenLbl.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.energyStorageSysCodeLenValueLbl = Label(self.LoginInfoFrame,textvariable=self.energyStorageSysCodeLen)
+        self.energyStorageSysCodeLenValueLbl.grid(row=20,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+
+        self.energyStorageSysCodeList = StringVar()
+        self.energyStorageSysCodeListLbl = Label(self.LoginInfoFrame,text='可充电储能子系统编码列表')
+        self.energyStorageSysCodeListLbl.grid(row=30,rowspan=1,column=10,columnspan=21,sticky=N+S+E+W)
+        self.energyStorageSysCodeListValueLbl = Label(self.LoginInfoFrame,textvariable=self.energyStorageSysCodeList)
+        self.energyStorageSysCodeListValueLbl.grid(row=40,rowspan=1,column=10,columnspan=21,sticky=N+S+E+W)
 
         self.msgListFrame = Frame(self.vhlViewFrame)
         self.msgListFrame.grid(row=20,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
@@ -186,8 +217,6 @@ class xGBT32960MonitorView():
         for i in range(len(COLUMNS)):
             self.vhlRTDataTree.heading(COLUMNS[i], text=COLUMNS[i])
 
-
-
         self.vhlRTDataTreeScrollY = Scrollbar(self.vhlRTDataFrame,orient=VERTICAL,command=self.vhlRTDataTree.yview)
         self.vhlRTDataTreeScrollY.grid(row=10,rowspan=1, column=20, sticky=N+S)
 
@@ -210,6 +239,10 @@ class xGBT32960MonitorView():
     
     def clearStatusBar(self,event):
         self.status.set('')
+        self.clearLogFrame()
+
+    def clearLogFrame(self):
+        self.logText.delete('1.0',END)
         
 class xGBT32960MonitorController():
     def __init__(self):
@@ -351,6 +384,10 @@ class xGBT32960MonitorController():
     def showLogin(self,gbobj):
         self.view.loginFlownum.set(gbobj.payload.flownum.phy)
         self.view.loginTime.set(gbobj.payload.gbtime.phy)
+        self.view.ICCID.set(gbobj.payload.ICCID.phy)
+        self.view.energyStorageSysCnt.set(gbobj.payload.BatSysCnt.phy)
+        self.view.energyStorageSysCodeLen.set(gbobj.payload.BatSysCodeLen.phy)
+        self.view.energyStorageSysCodeList.set(gbobj.payload.BatSysCodeList.phy)
 
     def showLogout(self,gbobj):
         self.view.logoutFlownum.set(gbobj.payload.flownum.phy)
@@ -432,6 +469,10 @@ class xGBT32960MonitorController():
         self.view.logoutTime.set('')
         self.view.collectTime.set('')
         self.view.heartbeatTime.set('')
+        self.view.ICCID.set('')
+        self.view.energyStorageSysCnt.set('')
+        self.view.energyStorageSysCodeLen.set('')
+        self.view.energyStorageSysCodeList.set('')
 
     def rxloop(self):
         while (not self.closeflag) and self.rxthdExist:

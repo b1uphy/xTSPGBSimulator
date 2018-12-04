@@ -14,7 +14,7 @@ LISTEMING_PORT = 9201
 gInterrupt_flagstr = ''
 gVIN_Vhl_Advisor_Mapping = {}
 
-xDEBUG = True
+xDEBUG = False
 
 import sys
 # sys.path.append('D:\\bluphy\\nutcloud\\xProject\\LogParser')
@@ -27,9 +27,9 @@ from async_timeout import timeout
 
 import base64
 
-from xTSPGBSimulator.xDBService.xDBService import writedb
-from xTSPGBSimulator.xOTAGBT32960.xOTAGB import OTAGBData,createOTAGBMsg,CMD,genGBTime
-from xTSPGBSimulator.xOTAGBT32960.GB_PARSER_HANDLER import parseGBPkgs
+from .xDBService import writedb
+from .xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime
+from .GB_PARSER_HANDLER import parseGBPkgs
 # BEGIN APP Layer/
 class Vehicle:
     def __init__(self,reader,writer,dbhdl):
@@ -70,6 +70,11 @@ class Vehicle:
         result = {'msg':None, 'code':0}
         self.msg = msg
         self.data = OTAGBData(msg)
+
+        if xDEBUG:
+            print('rx vehicle msg:')
+            self.data.printself()
+
         if self.VIN:
             #当不是连接后的第一条消息时
             if self.VIN != self.data.head.VIN.phy:
@@ -120,18 +125,21 @@ class Vehicle:
 
     def responseLogin(self):
         result = {'msg':None, 'code':0}
-        result['msg'] = createOTAGBMsg(CMD.inv['车辆登入'], b'\x01', self.VIN, 1, 30, genGBTime()+self.data.payload[6:])
+        if xDEBUG:
+            print('data payload')
+            print(self.data.payload.phy)
+        result['msg'] = createOTAGBMsg(b'\x01', b'\x01', self.VIN, 1, genGBTime()+self.data.payload.raw[6:])
         print("response result['msg']",result['msg'])
         return result
 
     def responseLogout(self):
         result = {'msg':None, 'code':'Close'}
-        result['msg'] = createOTAGBMsg(CMD.inv['车辆登出'], b'\x01', self.VIN, 1, 8, genGBTime()+self.data.payload[6:])        
+        result['msg'] = createOTAGBMsg(b'\x04', b'\x01', self.VIN, 1, genGBTime()+self.data.payload.raw[6:])        
         return result
 
     def responseHeartbeat(self):
         result = {'msg':None, 'code':0}
-        result['msg'] = createOTAGBMsg(CMD.inv['心跳'], b'\x01', self.VIN, 1, 0, b'')
+        result['msg'] = createOTAGBMsg(b'\x07', b'\x01', self.VIN, 1, b'')
         return result
 
     def destroy(self):
@@ -142,10 +150,10 @@ class Vehicle:
     def writeLog(self):
         ##采集数据写入日志
         rxtime = time.strftime('%Y%m%d %H:%M:%S,')
-        gbdatas = ','.join(parseGBPkgs(self.msg.hex()))
+        gbdatas = self.msg.hex()
 
         try:
-            with open(self.logname,'a') as log:
+            with open('log\\'+self.logname,'a') as log:
                 log.write(rxtime+gbdatas+'\n')
         except IOError:
             print('[Warning] : write log fail {0} -> {1}'.format(rxtime,gbdatas))
@@ -175,7 +183,7 @@ class Vehicle:
                     print('forward2Advisor') 
 
     async def receiveMsg(self)->bytes:
-        result = {'msg':None, 'code':0}
+        result = {'msg':None, 'code':-1}
         header = None
         try:
             # rxtime = time.strftime('%Y%m%d %H:%M:%S')
@@ -189,32 +197,41 @@ class Vehicle:
         except OSError:
             print('Connection with vehicle broken!')
             result['code'] = 'Connection broken'
+        except:
+            print('ERROR: unhandled error in receive vehicle msg header')
+        else:
+            if header:
+                #print('Received header {0}:\t{1}'.format(client,header.hex()))
+                lengthraw = header[-2:]
+                #print('lengthraw:{}'.format(lengthraw))
+                length = int.from_bytes(lengthraw, byteorder='big')+1 # the length including the sum byte
+                #print('length:{}'.format(length))
 
-        if header:
-            #print('Received header {0}:\t{1}'.format(client,header.hex()))
-            lengthraw = header[-2:]
-            #print('lengthraw:{}'.format(lengthraw))
-            length = int.from_bytes(lengthraw, byteorder='big')+1 # the length including the sum byte
-            #print('length:{}'.format(length))
+                data = None
+                try:
+                    async with timeout(TIMER_OTA_MSG_TIMEOUT):
+                        data = await self.reader.readexactly(length)
+                    systime = time.time()
+                except asyncio.TimeoutError:
+                    
+                    print('Rx timeout')
+                    print('Close connection because of timeout')
+                    result['code'] = 'Timeout!'
+                except asyncio.IncompleteReadError as err:
+                    print('WARNING: wrong msg format ',err)
 
-            data = None
-            try:
-                async with timeout(TIMER_OTA_MSG_TIMEOUT):
-                    data = await self.reader.readexactly(length)
-                systime = time.time()
-            except asyncio.TimeoutError:
-                
-                print('Rx timeout')
-                print('Close connection because of timeout')
-                result['code'] = 'Timeout!'
-            except asyncio.IncompleteReadError as err:
-                print('WARNING: wrong msg format ',err)
-            
-            if data:
-                result['msg'] = header+data            
-                writedb(result['msg'],systime,0,self.db)
-                timestamp = time.strftime('%Y%m%d %H:%M:%S',time.localtime(systime))
-                print('{0} Received from vehicle {1}:\t{2}'.format(timestamp,self.client,result['msg'].hex().upper()))  # <10>
+                except OSError:
+                    print('WARNING: got connection error')
+                    result['code'] = 'Connection broken'
+                except:
+                    print('ERROR: unhandled error in receive vehicle msg body')
+                else:
+                    if data:
+                        result['msg'] = header+data            
+                        writedb(result['msg'],systime,0,self.db)
+                        timestamp = time.strftime('%Y%m%d %H:%M:%S',time.localtime(systime))
+                        print('{0} Received from vehicle {1}:\t{2}'.format(timestamp,self.client,result['msg'].hex().upper()))  # <10>
+                        result['code'] = 0
 
         return result
 

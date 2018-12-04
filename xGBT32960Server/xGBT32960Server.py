@@ -2,6 +2,7 @@
 # -*- coding: utf8 -*-
 # bluphy@163.com
 
+# 2018-12-03 15:26:33 by xw: v0.4.3 Fix some bug if the received VIN is not ASCII character
 # 2018-10-31 16:28:08 by xw: v0.4.2 Rename the advisor register/unregister function to bindVhl and unbindVhl, fix a bug when unbind vehicle
 # 2018-10-31 16:38:49 by xw: v0.4.1 Update version number
 # 2018-10-31 15:19:23 by xw: v0.4 更新xGBT32960ServerCore，支持回复Advisor的请求消息
@@ -13,7 +14,7 @@
 # TODO: 
 # 
 
-str_version = 'v0.4.2'
+str_version = 'v0.4.3'
 
 # BEGIN Calibration
 DBHOST = '127.0.0.1'
@@ -28,7 +29,7 @@ LISTENING_ADVISOR_PORT = 31029
 # END Calibration
 
 # BEGIN debug
-xDEBUG = True
+
 
 # END debug 
 
@@ -41,8 +42,8 @@ import time
 import json
 from async_timeout import timeout
 
-from xTSPGBSimulator.xDBService.xDBService import connectdb
-from xGBT32960ServerCore.xGBT32960ServerCore import Vehicle,Advisor
+from xGBT32960ServerCore.xDBService import connectdb
+from xGBT32960ServerCore.xGBT32960ServerCore import Vehicle,Advisor,xDEBUG
 
 gDBhdl = None
 
