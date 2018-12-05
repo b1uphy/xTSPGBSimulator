@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-12-04 17:11:44 by xw: v0.5.8 Add feature of log in different color
 # 2018-12-03 12:04:13 by xw: v0.5.7 Add support of showing energy storage system info when login
 # 2018-11-26 16:43:27 by xw: v0.5.6 fix bug when clear view, the heartbeat time is not cleared
 # 2018-11-26 16:21:12 by xw: v0.5.5 fix bug for pyinstaller distributed exe file when loading icon 
@@ -25,10 +26,12 @@
 # 8.增加log记录功能
 # 9.增加本地数据库，支持数据库检索功能
 # 10.支持远程数据库检索功能
+# done 11.增加log配色 登入、登出、实时、补发、1、2、3级报警 (need verify for 补发和报警)
+# 12.log增加接收时间
+# 13.增加错误信息显示界面
+xDEBUG = False
 
-xDEBUG = True
-
-str_Version = 'v0.5.7'
+str_Version = 'v0.5.8'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
@@ -37,6 +40,7 @@ import sys,os,ctypes,socket,time
 # import xDBService.xDBService as xdbs
 from tkinter import *
 from tkinter.ttk import *
+
 from threading import Thread
 
 #import icon resource
@@ -230,6 +234,37 @@ class xGBT32960MonitorView():
         self.logTextScrollY = Scrollbar(self.vhlRTDataFrame,orient=VERTICAL,command=self.logText.yview)
         self.logTextScrollY.grid(row=20,rowspan=1, column=20, sticky=N+S)
         self.logText['yscrollcommand'] = self.logTextScrollY.set
+ 
+        self.logTextScrollYMode = 'auto'
+
+        self.logTextScrollY.bind('<Double-ButtonRelease-1>',self.setScrollModeToAuto)
+        self.logTextScrollY.bind('<ButtonRelease-1>',self.setScrollModeToManual)
+
+        self.logText.tag_add('01','1.0','1.0')
+        self.logText.tag_add('04','1.0','1.0')
+        self.logText.tag_add('02'+'0','1.0','1.0')
+        self.logText.tag_add('03','1.0','1.0')
+        self.logText.tag_add('07','1.0','1.0')
+        self.logText.tag_add('02'+'1','1.0','1.0')
+        self.logText.tag_add('02'+'2','1.0','1.0')
+        self.logText.tag_add('02'+'3','1.0','1.0')
+        self.logText.tag_add('default','1.0','1.0')
+
+        self.logText.tag_config('01', background='green')
+        self.logText.tag_config('04', background='light sky blue')
+        self.logText.tag_config('02'+'00', background='white')
+        self.logText.tag_config('02'+'01', background='yellow')
+        self.logText.tag_config('02'+'02', background='orange')
+        self.logText.tag_config('02'+'03', background='red')
+
+        self.logText.tag_config('03'+'00', background='grey')
+        self.logText.tag_config('03'+'01', background='light goldenrod')
+        self.logText.tag_config('03'+'02', background='dark goldenrod')
+        self.logText.tag_config('03'+'03', background='saddle brown')
+
+        self.logText.tag_config('07', background='bisque')
+
+        self.logText.tag_config(SEL, background='blue', foreground = 'black')
 
         self.status = StringVar()
         self.status.set('Hello')
@@ -237,6 +272,13 @@ class xGBT32960MonitorView():
         self.statusbar.grid(row=30,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         self.statusbar.bind('<Triple-Button-1>',self.clearStatusBar)
     
+    def setScrollModeToAuto(self,event):
+        self.logTextScrollYMode = 'auto'
+        self.logText.see(END)
+
+    def setScrollModeToManual(self,event):
+        self.logTextScrollYMode = 'manual'
+
     def clearStatusBar(self,event):
         self.status.set('')
         self.clearLogFrame()
@@ -419,27 +461,46 @@ class xGBT32960MonitorController():
     def showGBT32960Msg(self,gbRaw:bytes):
         if xDEBUG: print(gbRaw)
         gbobj = OTAGBData(gbRaw)
-        msgname = gbobj.name
-        self.view.logText.insert(END,gbobj.raw.hex()+'\n')
-        self.view.logText.see(END)
-        if msgname==CMD[b'\x01']:
+        cmd = gbobj.head.cmd.raw.hex()
+        show = None
+        tag = None
+        if cmd in {'01'}:
             if xDEBUG:  print('登入：{}'.format(self.model.configs['VIN']))
-            self.showLogin(gbobj)
-        elif msgname==CMD[b'\x04']:
+            tag = cmd
+            show = self.showLogin
+        elif cmd in {'04'}:
             if xDEBUG:  print('登出：{}'.format(self.model.configs['VIN']))
-            self.showLogout(gbobj)
-        elif msgname in {CMD[b'\x02']}:
+            tag = cmd
+            show = self.showLogout
+        elif cmd in {'02'}:
             if xDEBUG:  print('数据：{}'.format(self.model.configs['VIN']))
-            self.showGBData(gbobj)
-        elif msgname in {CMD[b'\x03']}:
+            tag = cmd + gbobj.payload.gbdata_07.alert_level
+            show = self.showGBData
+            
+        elif cmd in {'03'}:
             if xDEBUG:  print('数据：{}'.format(self.model.configs['VIN']))
-            # self.showGBData(gbobj)
-        elif msgname in {CMD[b'\x07']}:
+            tag = cmd + gbobj.payload.gbdata_07.alert_level
+            show = None
+
+        elif cmd in {'07'}:
             if xDEBUG:  print('数据：{}'.format(self.model.configs['VIN']))
-            self.showHeartBeat(gbobj)
+            tag = cmd
+            show = self.showHeartBeat
         else:
             if xDEBUG:  print('其他：{}'.format(self.model.configs['VIN']))
-            print('CMD {}'.format(msgname))
+  
+            tag = 'default'
+
+        if xDEBUG:
+            print('tag=',tag)
+
+        self.view.logText.insert(END,gbobj.raw.hex()+'\n',tag)
+
+        if show:
+            show(gbobj)
+
+        if self.view.logTextScrollYMode == 'auto':
+            self.view.logText.see(END)
 
     def initRTDataView(self,gbobj):
         for f in gbobj.payload.phy:
