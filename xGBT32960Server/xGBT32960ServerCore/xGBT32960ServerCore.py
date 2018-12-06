@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
-
+# 2018-12-06 15:47:43 by xw: delay some time after vehicle send logout msg
+# 2018-12-06 15:26:25 by xw: handle an unicode error from advisor msg
 # 2018-10-16 14:11:02 by xw: new created.
 
 msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
 
 # BEGIN Calibration
 TIMER_OTA_MSG_TIMEOUT = 30
+TIMER_OTA_MSG_GOODBYE = 1
 LISTEMING_PORT = 9201
 # END Calibration
 
@@ -19,7 +21,8 @@ xDEBUG = False
 import sys
 # sys.path.append('D:\\bluphy\\nutcloud\\xProject\\LogParser')
 
-import time,json
+import time
+import json
 import asyncio
 from asyncio import Queue,QueueEmpty,wait
 
@@ -62,7 +65,8 @@ class Vehicle:
             responseMsg = result['msg']
             if responseMsg:
                 await self.sendMsg(responseMsg)
-            if result['code'] == 'Close':            
+            if result['code'] == 'Close':
+                await asyncio.sleep(TIMER_OTA_MSG_GOODBYE)    
                 break        
 
 
@@ -427,18 +431,22 @@ class Advisor:
         
     def processMsg(self,msg:bytes):
         result = {'msg':None, 'code':0}
-        msgobj = json.loads(msg.decode('utf8'))
-        if type(msgobj) == dict:
-            if msgobj['name'] == 'login':
-                self.login(msgobj)
-            elif msgobj['name'] == 'select_vehicle':
-                self.selectVhl(msgobj)
-            elif msgobj['name'] == 'disconnect_vehicle':
-                self.disconnect_vehicle(msgobj)
-            elif msgobj['name'] == 'echo':
-                self.echo(msgobj)
+        try:
+            msgobj = json.loads(msg.decode('utf8'))
+        except UnicodeError as e:
+            print('WARNING: advisor msg format is not good,',e)
         else:
-            print('WARNING: msg format error : {0}'.format(msg.hex()))
+            if type(msgobj) == dict:
+                if msgobj['name'] == 'login':
+                    self.login(msgobj)
+                elif msgobj['name'] == 'select_vehicle':
+                    self.selectVhl(msgobj)
+                elif msgobj['name'] == 'disconnect_vehicle':
+                    self.disconnect_vehicle(msgobj)
+                elif msgobj['name'] == 'echo':
+                    self.echo(msgobj)
+            else:
+                print('WARNING: msg format error : {0}'.format(msg.hex()))
 
         return result
 

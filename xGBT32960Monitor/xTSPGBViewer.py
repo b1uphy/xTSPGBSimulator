@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-12-06 16:48:16 by xw: v0.5.9 Add feature to analyze history data form log window
 # 2018-12-04 17:11:44 by xw: v0.5.8 Add feature of log in different color
 # 2018-12-03 12:04:13 by xw: v0.5.7 Add support of showing energy storage system info when login
 # 2018-11-26 16:43:27 by xw: v0.5.6 fix bug when clear view, the heartbeat time is not cleared
@@ -19,7 +20,7 @@
 # done 1.实时数据显示部分增加滚动条
 # 2.数据校验助手，提示数据逻辑问题
 # 3.优化初始窗口大小
-# 4.增加服务器选择界面及服务器历史记录
+# done 4.增加服务器选择界面及服务器历史记录
 # 5.增加用户登入界面
 # 6.分割应用层与TCP层
 # 7.增加支持 TLS1.2协议与服务器通讯
@@ -27,11 +28,11 @@
 # 9.增加本地数据库，支持数据库检索功能
 # 10.支持远程数据库检索功能
 # done 11.增加log配色 登入、登出、实时、补发、1、2、3级报警 (need verify for 补发和报警)
-# 12.log增加接收时间
+# done 12.log增加接收时间
 # 13.增加错误信息显示界面
 xDEBUG = False
 
-str_Version = 'v0.5.8'
+str_Version = 'v0.5.9'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
@@ -241,18 +242,22 @@ class xGBT32960MonitorView():
         self.logTextScrollY.bind('<ButtonRelease-1>',self.setScrollModeToManual)
 
         self.logText.tag_add('01','1.0','1.0')
+        self.logText.tag_add('02'+'00','1.0','1.0')
+        self.logText.tag_add('02'+'01','1.0','1.0')
+        self.logText.tag_add('02'+'02','1.0','1.0')
+        self.logText.tag_add('02'+'03','1.0','1.0')
+        self.logText.tag_add('0300','1.0','1.0')
+        self.logText.tag_add('0301','1.0','1.0')
+        self.logText.tag_add('0302','1.0','1.0')
+        self.logText.tag_add('0303','1.0','1.0')
         self.logText.tag_add('04','1.0','1.0')
-        self.logText.tag_add('02'+'0','1.0','1.0')
-        self.logText.tag_add('03','1.0','1.0')
         self.logText.tag_add('07','1.0','1.0')
-        self.logText.tag_add('02'+'1','1.0','1.0')
-        self.logText.tag_add('02'+'2','1.0','1.0')
-        self.logText.tag_add('02'+'3','1.0','1.0')
+
         self.logText.tag_add('default','1.0','1.0')
 
         self.logText.tag_config('01', background='green')
         self.logText.tag_config('04', background='light sky blue')
-        self.logText.tag_config('02'+'00', background='white')
+        self.logText.tag_config('02'+'00')
         self.logText.tag_config('02'+'01', background='yellow')
         self.logText.tag_config('02'+'02', background='orange')
         self.logText.tag_config('02'+'03', background='red')
@@ -294,9 +299,11 @@ class xGBT32960MonitorController():
 
         self.model = xGBT32960MonitorModel()
 
-        self.view.toggleConnectingBtn.bind('<Button-1>',self.toggleConnecting)
-        self.view.toggleBindingBtn.bind('<Button-1>',self.toggleBinding)
-        self.view.echoBtn.bind('<Button-1>',self.echo)
+        self.view.toggleConnectingBtn.bind('<ButtonRelease-1>',self.toggleConnecting)
+        self.view.toggleBindingBtn.bind('<ButtonRelease-1>',self.toggleBinding)
+        self.view.echoBtn.bind('<ButtonRelease-1>',self.echo)
+        self.view.logText.bind('<ButtonRelease-1>',self.setRTDataFrameModeToHistory)  #左键单击进入历史分析模式
+        self.view.logText.bind('<ButtonRelease-3>',self.setRTDataFrameModeToRealtime)  #右键单击返回实时模式
 
         self.view.host.set(self.model.configs['host'])
         self.view.hostCombobox.configure(values=self.model.configsHistory['hostHistory'])
@@ -305,6 +312,8 @@ class xGBT32960MonitorController():
         self.rxthdExist = False #接收消息的线程是否启动的标记量
 
         self.rtViewInitFlag = False #实时信息显示窗数据项目初始化标记
+
+        self.rtDataFrameMode = 'realtime' #实时信息显示窗显示模式标记，分为 realtime/history
 
         self.view.VIN.set(self.model.configs['VIN'])
         self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
@@ -328,14 +337,6 @@ class xGBT32960MonitorController():
     def getVhlConnectingStatus(self):
         return 'To Be Implement'
 
-    def toggleBinding(self,event):
-        print('function toggle binding')
-        if self.model.connected:
-            if self.model.binded:
-                self.unbindVhl()                
-            else:
-                self.bindVhl()
-                
     def toggleConnecting(self,event):
         print('function toggle connecting')
         if self.model.connected: # 连接 -> 断开连接
@@ -352,6 +353,38 @@ class xGBT32960MonitorController():
                 self.toggleBtnState()
             else:
                 self.view.status.set('ERROR: 无法连接到服务器')
+
+    def toggleBinding(self,event):
+        print('function toggle binding')
+        if self.model.connected:
+            if self.model.binded:
+                self.unbindVhl()                
+            else:
+                self.bindVhl()
+                
+    def echo(self,event):
+        if self.model.connected:
+            self.model.sendMsg(eval(msg_echo))
+            self.view.status.set('echo')
+
+    def setRTDataFrameModeToHistory(self,event):
+        self.rtDataFrameMode = 'history'
+        gbraw = bytes.fromhex(self.view.logText.get('current linestart', 'current lineend')[20:].strip())
+        print('history gbraw=',gbraw.hex())
+        try:
+            gbobj = OTAGBData(gbraw)
+        except:
+            print('WARNING: log format is not right')
+        else:
+            if gbobj.head.cmd.raw in {b'\x02',b'\x03'}:
+                print('show history')
+                self.showGBData(gbobj)
+            else:
+                print('not a data msg')
+
+    def setRTDataFrameModeToRealtime(self,event):
+        print('setRTDataFrameModeToRealtime')
+        self.rtDataFrameMode = 'realtime'
 
     def toggleBtnState(self):
         print('disconnect TSP2')
@@ -383,14 +416,8 @@ class xGBT32960MonitorController():
 
         return result
 
-
     def login(self):
         self.model.sendMsg(self.model.create_msg_login())
-
-    def echo(self,event):
-        if self.model.connected:
-            self.model.sendMsg(eval(msg_echo))
-            self.view.status.set('echo')
 
     def bindVhl(self):
         VIN = self.view.VIN.get().strip().upper()
@@ -415,11 +442,11 @@ class xGBT32960MonitorController():
     def showMsg(self):
         msg = self.model.rxq.get()
         if not msg: return
-        msgstr = '{0}\n'.format(msg)
+
         if msg['name']=='gbdata':
             gbRaw = base64.standard_b64decode(msg['data'].encode('ascii'))
             self.showGBT32960Msg(gbRaw)
-        # self.view.logWindow.insert(END,msgstr)
+
         else:
             self.view.status.set(msg)
 
@@ -494,9 +521,10 @@ class xGBT32960MonitorController():
         if xDEBUG:
             print('tag=',tag)
 
-        self.view.logText.insert(END,gbobj.raw.hex()+'\n',tag)
+        self.view.logText.insert(END,''.join([timestamp(),'\t',gbobj.raw.hex(),'\n']),tag)
 
-        if show:
+        print('self.rtDataFrameMode=',self.rtDataFrameMode)
+        if self.rtDataFrameMode == 'realtime' and show:
             show(gbobj)
 
         if self.view.logTextScrollYMode == 'auto':

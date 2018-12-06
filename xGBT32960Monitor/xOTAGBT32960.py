@@ -792,7 +792,7 @@ class PayloadData(Field):
         super(PayloadData,self).__init__('采集数据',raw,convertfunc=convert)
         for field in self.phy[1:]:
             cat = '{}'.format(type(field))[-4:-2]
-            print(cat)
+            # print(cat)
             exec('self.gbdata_{} = field'.format(cat))
 
     def split(self):

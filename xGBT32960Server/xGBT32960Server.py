@@ -44,6 +44,7 @@ from async_timeout import timeout
 
 from xGBT32960ServerCore.xDBService import connectdb
 from xGBT32960ServerCore.xGBT32960ServerCore import Vehicle,Advisor,xDEBUG
+from xGBT32960ServerCore.xOTAGBT32960 import timestamp
 
 gDBhdl = None
 
@@ -77,8 +78,8 @@ def main(address2vhl='127.0.0.1', port2vhl=LISTENING_VHL_PORT, address2advisor='
 
     task = asyncio.gather(server2vhl_coro,server2advisor_coro)
     servers = loop.run_until_complete(task)
-    print('Vehicle interface serving on {0}'.format(servers[0].sockets[0].getsockname()))
-    print('Advisor interface serving on {0}'.format(servers[1].sockets[0].getsockname()))
+    print('{0}\tVehicle interface serving on {1}'.format(timestamp(),servers[0].sockets[0].getsockname()))
+    print('{0}\tAdvisor interface serving on {1}'.format(timestamp(),servers[1].sockets[0].getsockname()))
     try:
         print('run loop')
         loop.run_forever()

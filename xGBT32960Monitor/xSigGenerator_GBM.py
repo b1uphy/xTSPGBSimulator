@@ -127,7 +127,6 @@ class xGBT32960MonitorModel:
         length = len(body)
         header = length.to_bytes(3,'big')
         self.txq.put(header+body+tail)
-        self.socketStatus = None
 
     def createSocket(self,serverip=SERVER_IP,serverport=SERVER_PORT):
         
@@ -206,7 +205,7 @@ class xGBT32960MonitorModel:
                 if name != 'gbdata':
                     print(msg,'\n?>',end='')
                 else:
-                    print('Received a GB/T32960 msg','\n?>',end='')
+                    print('Received a GB/T 32960 msg','\n?>',end='')
                 # print(gbdata_hndl(data),'\n?>',end='')
         
         # print('rx stopped','\n?>',end='')
