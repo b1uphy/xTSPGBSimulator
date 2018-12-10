@@ -60,29 +60,36 @@ def splitData(raw:bytes):
     if xDEBUG:    print('cat=',cat)
     length = GBDataLengths[cat-1]
 
-    if 0>length:
-        if 2==cat: #驱动电机数据是变长的
+    if 0 > length:
+        if 2 == cat: #驱动电机数据是变长的
             length = raw[1]*12+2
-        elif 3==cat:
+        elif 3 == cat:
             length = int.from_bytes(raw[7:8],'big')+18
-        elif 7==cat:
-            n1=raw[6]
-            n2=raw[7+4*n1]
-            n3=raw[8+4*(n1+n2)]
-            n4=raw[9+4*(n1+n2+n3)]
+        elif 7 == cat:
+            n1 = raw[6]
+            n2 = raw[7+4*n1]
+            n3 = raw[8+4*(n1+n2)]
+            n4 = raw[9+4*(n1+n2+n3)]
             length = 4*(n1+n2+n3+n4)+10
-        elif 8==cat:
+        elif 8 == cat:
             length = 204
-        elif 9==cat:
+        elif 9 == cat:
             length = 30
         else:
-            print('ERROR: length mot correct')
+            print('ERROR: length mot correct,raw=',raw.hex())
             length = 0
-    catdata = raw[1:length]
-    raw = raw[length:]
+
+    if length > 0:
+        catdata = raw[1:length]
+        raw = raw[length:]
+    else:
+        catdata = raw
+        raw = b''
+
     if xDEBUG:
         print('catdata=',catdata.hex()) 
         print('rawleft=',raw.hex())
+
     return (cat,catdata,raw)
 
 def parseGBTime (raw:bytes):
@@ -469,6 +476,14 @@ class GBData_02(Field):
       
         return fields
 
+class GBData_03(Field):
+    def __init__(self,raw:bytes):
+        super(GBData_03,self).__init__('03 燃料电池',raw)
+
+class GBData_04(Field):
+    def __init__(self,raw:bytes):
+        super(GBData_04,self).__init__('04 发动机',raw)
+
 class GBData_05(Field):
 
     Names = ['定位状态','经度','纬度']
@@ -756,8 +771,6 @@ class GBData_09(Field):
 
         return fields
 
-
-
     @staticmethod
     def parseProbeTempList(raw:bytes):
         fields = []  
@@ -781,13 +794,11 @@ class PayloadData(Field):
                 cat,catdata,raw = splitData(raw)
                 try:
                     fields.append (eval('GBData_%(cat)02d(catdata)'%{'cat':cat}))               
-                except NameError:
-                    if xDEBUG:
-                        print('Need to implenment parseHandler for ','GBData_%(cat)02d(catdata)'%{'cat':cat})
-                else:
-                    if xDEBUG: print('new code')
-                    # exec('self.gbdata_%(cat)02d = fields[-1]'%{'cat':cat},globals(),locals())
-                    # hdl = fields[-1]  #将数据段暴露在实例命名空间中以方便引用
+                except NameError as e:
+                    print('ERROR: Invalid Data, raw=',raw.hex())
+                    raise e   
+                # else:
+                #     if xDEBUG: print('new code')
             return fields
         super(PayloadData,self).__init__('采集数据',raw,convertfunc=convert)
         for field in self.phy[1:]:
@@ -795,8 +806,50 @@ class PayloadData(Field):
             # print(cat)
             exec('self.gbdata_{} = field'.format(cat))
 
-    def split(self):
-        pass
+    @staticmethod  #not used now
+    def splitData(raw:bytes):
+        '''
+        input raw packets and return a cat and its data
+        '''
+        cat = raw[0]
+        if xDEBUG:    print('raw=',raw.hex())
+        if xDEBUG:    print('cat=',cat)
+        length = GBDataLengths[cat-1]
+
+        if 0>length:
+            if 2==cat: #驱动电机数据是变长的
+                length = raw[1]*12+2
+            elif 3==cat:
+                length = int.from_bytes(raw[7:8],'big')+18
+            elif 7==cat:
+                n1=raw[6]
+                n2=raw[7+4*n1]
+                n3=raw[8+4*(n1+n2)]
+                n4=raw[9+4*(n1+n2+n3)]
+                length = 4*(n1+n2+n3+n4)+10
+            elif 8==cat:
+                length = 204
+            elif 9==cat:
+                length = 30
+            else:
+                print('ERROR: length mot correct,raw=',raw.hex())
+                length = 0
+                
+        catdata = raw[1:length]
+        raw = raw[length:]
+        if xDEBUG:
+            print('catdata=',catdata.hex()) 
+            print('rawleft=',raw.hex())
+        return (cat,catdata,raw)
+
+class PlayloadBlank(Field):
+    def __init__(self):
+        super(PlayloadBlank,self).__init__('空数据',b'')
+
+class PlayloadUnknown(Field):
+    def __init__(self, raw:bytes):
+        super(PlayloadUnknown,self).__init__('未知数据',raw)
+        print('ERROR: you may need report the bug to tbox owner')
 
 class OTAGBData(Field):
     def __init__(self, msg:bytes):
@@ -805,16 +858,22 @@ class OTAGBData(Field):
         生成消息的树形结构{'name00':[{'name10':value01},{'name11':value11},...]}
         '''
         def convert(msg:bytes):
-            head = Head(msg[:24])
-            chk = Field('校验字节',msg[-1])
             try:
-                cls = eval('Payload'+OTAGBData.parsePayloadType(head.cmd.raw))
-                payload = cls(msg[24:-1])
-                pass
-            except NameError as e:
-                print(e)
-                print('This msg should be heartbeat')
-                payload = None
+                head = Head(msg[:24])
+            except:
+                print('ERROR: can not analyze msg head, msg=',msg.hex())
+                return None
+            else:
+                chk = Field('校验字节',msg[-1])
+
+                try:
+                    cls = eval('Payload'+OTAGBData.parsePayloadType(head.cmd.raw))
+                    payload = cls(msg[24:-1])
+                    pass
+                except NameError as e:
+                    print(e)
+                    print('ERROR: Can not analyze the msg payload,msg raw=',msg.hex())
+                    payload = PlayloadUnknown(msg[24:-1])
 
             return [head,payload,chk]
 
@@ -834,8 +893,11 @@ class OTAGBData(Field):
             result = 'Login'
         elif b'\x04'==cmd:
             result = 'Logout'
-        elif b'\x07'==cmd:
-            result = 'Heartbeat'
+        elif b'\x07'==cmd:  #心跳报文负载为空
+            result = 'Blank'
+        else:
+            result = 'Unknown'
+
         return result
 
     def detectMsgFormat(self, msg:bytes)->bool:
@@ -873,11 +935,31 @@ if __name__ == '__main__':
     # msg2 = b'##\x04\xFELXVJ2GFC2GA030003\x01\x00\x08\x11\x11\x11\x11\x11\x11\x33\x33\x33'
     # gblogout = OTAGBData(msg2)
 
-    msg3 = '232302FE4C4D47464531473030303030303053593101013512051005223101020301FFFF00000000000007D00002000000FF0002010103000FA043F800000013880501000000000000000006010100000101000001010001010007000000000000000000080101000007D0006000016000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009010100180000000000000000000000000000000000000000000000008F'
-    gbdata3 = OTAGBData(bytes.fromhex(msg3))
-    gbdata3.printself()
-    print('level=',gbdata3.payload.gbdata_07.alert_level)
+    # msg3 = '232302FE4C4D47464531473030303030303053593101013512051005223101020301FFFF00000000000007D00002000000FF0002010103000FA043F800000013880501000000000000000006010100000101000001010001010007000000000000000000080101000007D0006000016000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009010100180000000000000000000000000000000000000000000000008F'
+    # gbdata3 = OTAGBData(bytes.fromhex(msg3))
+    # gbdata3.printself()
+    # print('level=',gbdata3.payload.gbdata_07.alert_level)
     
+    # print('')
+    # print('msg2_1')
+    # msg2_1 = '232302fe4c58564433473242334a41303139323134010127120c06112d35010201010000000023fa0f96268e62010006fb0000050006edb8a6026438390601011040012b1004010b34010132070000000000000000000801010f96268e00600001601040104010401040104010401040104010401040104010401040102c10401040102c102c102c104010401040102c101810401040104010401040104010401040104010401040104010401040102c1040104010401004102c1040104010401040102c10401040104010401040104010401040104010401040102c10401040104010401040102c10401040104010401040104010401040102c1040102c10401040104010401040102c1040104010401040102c10401040102c1040104010401040090101001832333333333333333333343333333333333333333233333221'
+    # gbdata = OTAGBData(bytes.fromhex(msg2_1))
+    # gbdata.printself()
+    # print('level=',gbdata.payload.gbdata_07.alert_level)
+
+    # print('')
+    # print('msg2_2')
+    # msg2_2 = '232303FE4C58564433473242334A4130313932313401013523FA0FA02710640100074A0000020101032C4E204E202B04CE2710050006EDB8A6026438390601011054012B1018010233010132070000000000000000000801010FA0271000600001601054104010541054105410401054105410541054105410401054104010541054102C104010401040105410541040102C10401054105410541054104010541054105410541054105410541054104010541054105410181040105410541054105410401054105410541054105410541054105410541054105410401054105410541054105410401054105410541054105410541054104010401054104010401054105410401054102C1054105410541054102C10541054104010541054105410540901010018323333333333333233333333333333333333333332323232000000000000000000000000000045'
+    # gbdata = OTAGBData(bytes.fromhex(msg2_2))
+    # gbdata.printself()
+    # print('level=',gbdata.payload.gbdata_07.alert_level)
+
+    print('')
+    print('msg2_3')
+    msg2_3 = '232302FE4C58564433473242334A41303139323134010135120C070E1A27010103010000000023FA0ECE27A651010F092C0000020101042C4E214E16280ECE2706050006EDB8A40264384C06010A0F78012B0F3C01022D01012B070000000000000000000801010ECE27A600600001600F640F640F640F640F640F640F640F640F640F780F640F640F640F640F640F640F500F640F640F640F640F780F640F500F640F640F640F640F640F640F640F640F640F640F640F640F640F640F640F640F780F780F3C0F500F640F780F640F640F500F640F640F640F640F640F640F640F640F640F640F640F640F640F640F640F640F640F500F640F640F640F640F640F780F640F640F640F780F640F640F780F640F640F780F500F640F640F640F780F500F640F640F500F640F640F640F6409010100182B2D2D2D2D2D2D2C2C2D2D2D2D2D2D2C2B2D2D2D2D2D2D2B65'
+    gbdata = OTAGBData(bytes.fromhex(msg2_3))
+    gbdata.printself()
+    print('level=',gbdata.payload.gbdata_07.alert_level)
     # msg4 ='232302FE4C58564A3247464332474130323939383401014111091A0F1516010103010000000001220FA0272463010F0870000002020104494E204E20450FAA27060204494E204E16450FB427100501000000000000000006010810540101104001023F01013E070000000000000000000801010FA02724006000016010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401054104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010401040104010541040104010401040104010401040104010541040104010401040104010541040104010401040105409010100183E3F3E3E3E3E3E3F3F3F3F3E3E3F3F3F3F3F3F3E3E3E3E3FFA'
     # msg4 =''.join('23 23 02 FE 4C 4D 47 46 45 31 47 30 30 30 30 30 30 30 53 59 31 01 01 41 12 0B 13 11 1A 23 01 02 03 01 FF FF 00 00 00 00 00 00 07 D0 00 02 00 00 00 FF 00 02 02 01 03 00 0F A0 43 F8 00 00 00 13 88 02 03 00 0F A0 43 F8 00 00 00 13 88 05 01 00 00 00 00 00 00 00 00 06 01 01 00 00 01 01 00 00 01 01 00 01 01 00 07 00 00 00 00 00 00 00 00 00 08 01 01 00 00 07 D0 00 60 00 01 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 09 01 01 00 18 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 45'.split())
     # gbdata = OTAGBData(bytes.fromhex(msg4))

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-12-10 12:56:30 by xw: v0.5.9.4 optimize the color for longin msg in log window
+# 2018-12-10 11:36:37 by xw: v0.5.9.3 fix bug when in history mode, login/logout/msg is not update in the left panel, move collect time to right panel
+# 2018-12-08 00:13:49 by xw: v0.5.9.2 fix bug happened when user click disconnect button but server is not available
+# 2018-12-07 18:54:11 by xw: v0.5.9.1 set log timestamp background to none
 # 2018-12-06 16:48:16 by xw: v0.5.9 Add feature to analyze history data form log window
 # 2018-12-04 17:11:44 by xw: v0.5.8 Add feature of log in different color
 # 2018-12-03 12:04:13 by xw: v0.5.7 Add support of showing energy storage system info when login
@@ -19,7 +23,7 @@
 #### TODO:
 # done 1.实时数据显示部分增加滚动条
 # 2.数据校验助手，提示数据逻辑问题
-# 3.优化初始窗口大小
+# done 3.优化初始窗口大小
 # done 4.增加服务器选择界面及服务器历史记录
 # 5.增加用户登入界面
 # 6.分割应用层与TCP层
@@ -32,7 +36,7 @@
 # 13.增加错误信息显示界面
 xDEBUG = False
 
-str_Version = 'v0.5.9'
+str_Version = 'v0.5.9.4'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
@@ -156,11 +160,7 @@ class xGBT32960MonitorView():
         self.logoutTimeValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.logoutTime)
         self.logoutTimeValueLbl.grid(row=20,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
 
-        self.collectTime = StringVar()
-        self.collectTimeLbl = Label(self.vhlLoggingInfoFrame,text='采集时间:')
-        self.collectTimeLbl.grid(row=30,rowspan=1,column=30,columnspan=1,sticky=N+S+E+W)
-        self.collectTimeValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.collectTime)
-        self.collectTimeValueLbl.grid(row=30,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
+
 
         self.heartbeatTime = StringVar()
         self.heartbeatLbl = Label(self.vhlLoggingInfoFrame,text='心跳报文:')
@@ -210,6 +210,17 @@ class xGBT32960MonitorView():
         self.vhlRTDataFrame.rowconfigure(10,weight=1)
         self.vhlRTDataFrame.columnconfigure(10,weight=1)
 
+        self.collectTimeFrame = Frame(self.vhlRTDataFrame)
+        self.collectTimeFrame.grid(row=5,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.collectTimeFrame.rowconfigure(10,weight=1)
+        self.collectTimeFrame.columnconfigure(20,weight=1)
+
+        self.collectTime = StringVar()
+        self.collectTimeLbl = Label(self.collectTimeFrame,text='采集时间:')
+        self.collectTimeLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
+        self.collectTimeValueLbl = Label(self.collectTimeFrame,textvariable=self.collectTime)
+        self.collectTimeValueLbl.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+
         self.vhlRTDataTree = Treeview(self.vhlRTDataFrame,columns=COLUMNS,show=['tree','headings'])
         self.vhlRTDataTree.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         minwidth = self.vhlRTDataTree.column('#0', option='minwidth')
@@ -255,7 +266,7 @@ class xGBT32960MonitorView():
 
         self.logText.tag_add('default','1.0','1.0')
 
-        self.logText.tag_config('01', background='green')
+        self.logText.tag_config('01', background='lime green')
         self.logText.tag_config('04', background='light sky blue')
         self.logText.tag_config('02'+'00')
         self.logText.tag_config('02'+'01', background='yellow')
@@ -308,16 +319,16 @@ class xGBT32960MonitorController():
         self.view.host.set(self.model.configs['host'])
         self.view.hostCombobox.configure(values=self.model.configsHistory['hostHistory'])
         self.view.hostCombobox.configure(postcommand=self.updateHostDropDown)
-        
+
+        self.view.VIN.set(self.model.configs['VIN'])
+        self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
+        self.view.VINCombobox.configure(postcommand=self.updateVINDropDown)
+
         self.rxthdExist = False #接收消息的线程是否启动的标记量
 
         self.rtViewInitFlag = False #实时信息显示窗数据项目初始化标记
 
         self.rtDataFrameMode = 'realtime' #实时信息显示窗显示模式标记，分为 realtime/history
-
-        self.view.VIN.set(self.model.configs['VIN'])
-        self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
-        self.view.VINCombobox.configure(postcommand=self.updateVINDropDown)
 
         self.view.root.mainloop()
         
@@ -339,10 +350,12 @@ class xGBT32960MonitorController():
 
     def toggleConnecting(self,event):
         print('function toggle connecting')
-        if self.model.connected: # 连接 -> 断开连接
+        # print('self.model.connected = ',self.model.connected)
+        action = self.view.connectingActionStrVar.get()
+        if action == 'Disconnect': # 连接 -> 断开连接
             self.model.connected = False
             print('disconnect TSP1')
-            self.toggleBtnState()           
+            self.updateBtnState()           
             self.disconnectTSP()
             self.view.connectingActionStrVar.set('Connect')
             
@@ -350,7 +363,7 @@ class xGBT32960MonitorController():
             result = self.connectTSP()
             if 0==result: 
                 self.view.connectingActionStrVar.set('Disconnect')
-                self.toggleBtnState()
+                self.updateBtnState()
             else:
                 self.view.status.set('ERROR: 无法连接到服务器')
 
@@ -385,15 +398,6 @@ class xGBT32960MonitorController():
     def setRTDataFrameModeToRealtime(self,event):
         print('setRTDataFrameModeToRealtime')
         self.rtDataFrameMode = 'realtime'
-
-    def toggleBtnState(self):
-        print('disconnect TSP2')
-        if self.model.connected:
-            self.view.toggleBindingBtn.state(['!disabled'])
-            self.view.echoBtn.state(['!disabled'])
-        else:
-            self.view.toggleBindingBtn.state(['disabled'])
-            self.view.echoBtn.state(['disabled'])
 
     def disconnectTSP(self):
         self.logout()
@@ -439,16 +443,34 @@ class xGBT32960MonitorController():
         self.model.destroy()
         # self.model=None
 
-    def showMsg(self):
+    def processMsg(self):
         msg = self.model.rxq.get()
         if not msg: return
-
-        if msg['name']=='gbdata':
+        msg_name = msg['name']
+        if msg_name == 'gbdata':
             gbRaw = base64.standard_b64decode(msg['data'].encode('ascii'))
             self.showGBT32960Msg(gbRaw)
-
         else:
             self.view.status.set(msg)
+            if msg_name == 'internal_event':
+                event_name = msg['data']['event_name']
+                if event_name == TSP_DISCONNECTED:
+                    self.updateConnectingStatusNotConnected()
+            
+
+    def updateConnectingStatusNotConnected(self):
+        self.view.connectingActionStrVar.set('Connect')
+        self.view.bindingActionStrVar.set('Bind')
+        self.updateBtnState()
+
+    def updateBtnState(self):
+        print('update button state')
+        if self.model.connected:
+            self.view.toggleBindingBtn.state(['!disabled'])
+            self.view.echoBtn.state(['!disabled'])
+        else:
+            self.view.toggleBindingBtn.state(['disabled'])
+            self.view.echoBtn.state(['disabled'])
 
     def showLogin(self,gbobj):
         self.view.loginFlownum.set(gbobj.payload.flownum.phy)
@@ -521,14 +543,19 @@ class xGBT32960MonitorController():
         if xDEBUG:
             print('tag=',tag)
 
-        self.view.logText.insert(END,''.join([timestamp(),'\t',gbobj.raw.hex(),'\n']),tag)
-
-        print('self.rtDataFrameMode=',self.rtDataFrameMode)
-        if self.rtDataFrameMode == 'realtime' and show:
-            show(gbobj)
+        self.view.logText.insert(END,''.join([timestamp(),'\t']))
+        self.view.logText.insert(END, ''.join([gbobj.raw.hex(),'\n']), tag)
 
         if self.view.logTextScrollYMode == 'auto':
             self.view.logText.see(END)
+
+        print('self.rtDataFrameMode=',self.rtDataFrameMode)
+
+        if self.rtDataFrameMode == 'realtime' and show:
+            show(gbobj)
+        else:
+            if  cmd in {'01','04','07'}:
+                show(gbobj)
 
     def initRTDataView(self,gbobj):
         for f in gbobj.payload.phy:
@@ -567,12 +594,11 @@ class xGBT32960MonitorController():
         while (not self.closeflag) and self.rxthdExist:
             self.model.rxMsg()
             try:           
-                self.showMsg() #this function will block until get a msg from server
+                self.processMsg() #this function will block until get a msg from server
             except Exception as e:
                 print(e)
                 print('WARNING:','Can not show msg to ui')
         print('exit Controller rxloop')
-
 
 if __name__ == '__main__':
 

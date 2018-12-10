@@ -33,8 +33,19 @@ msg_select_vehicle = "{'name': 'select_vehicle', 'data': {'VIN': ''} }"
 msg_logout = "{'name': 'logout', 'data': '' }"
 msg_disconnect_vehicle = "{'name': 'disconnect_vehicle', 'data': '' }"
 msg_echo  = "{'name': 'echo', 'data': '' }"
-msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
+msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''} } }"
+
+## internal msg
+msg_internal_event = "{'name': 'internal_event', 'data':{'event_name': '', 'event_data': ''} }"
+msg_warning = "{'name':'warning, 'data':{'warning_name': '', 'warning_data': ''} }"
+msg_error = "{'name':'error, 'data':{'error_name': '', 'error_data': ''} }"
+## event names
+xEventNames = {'TSP_DISCONNECTED'}
+
+TSP_DISCONNECTED = 'TSP_DISCONNECTED'
+
 #### END## message template
+
 
 
 
@@ -171,6 +182,7 @@ class xGBT32960MonitorModel:
                 self.s.sendall(msg)
             except OSError:
                 self.connected = False
+                self.rxq.put(self.create_msg_internal_event(TSP_DISCONNECTED))
                 break
             # else:
                     # txflag = False
@@ -198,7 +210,11 @@ class xGBT32960MonitorModel:
             else:
                 # self.rxq.put(body_tail[:-1])
                 print('')
-                msg = json.loads(body_tail[:-1].decode('utf8'))
+                try:
+                    msg = json.loads(body_tail[:-1].decode('utf8'))
+                except:
+                    print('WARNING: received an invalid msg')
+
                 self.rxq.put(msg)
                 name = msg['name']
                 data = msg['data']
@@ -232,7 +248,7 @@ class xGBT32960MonitorModel:
         time.sleep(TIMER_CLOSESOCKET_DELAY)
         self.closeSocket()
 
-    def create_msg_select_vehicle(self,VIN:str = None):
+    def create_msg_select_vehicle(self, VIN:str = None):
         msg = eval(msg_select_vehicle)
         if VIN:
             msg['data']['VIN']=VIN
@@ -246,7 +262,19 @@ class xGBT32960MonitorModel:
         msg['data']['username']=self.configs['username']
         return msg
 
+    def create_msg_common(self,msg_template,*data):
+        msg = eval(msg_template)
+        msg['data']
 
+    def create_msg_internal_event(self, event_name, event_data = None):
+        msg = eval(msg_internal_event)
+        msg['data']['event_name'] = event_name
+        if event_data:
+            msg['data']['event_data'] = event_data
+        return msg
+    def create_msg_warning(self,warning_name,warning_data):
+        msg = eval
+        
 def main(serverip=SERVER_IP,serverport=SERVER_PORT):
 
     msg_select_vehicle1 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G0000000SY1'} }"

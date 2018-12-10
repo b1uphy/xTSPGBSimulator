@@ -1,3 +1,7 @@
 #ignore all pre compile files of python
 *.pyc
 *.xmind
+*.csv
+.build/*
+*.spec
+.dist/*
