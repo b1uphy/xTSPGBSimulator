@@ -16,17 +16,24 @@
 
 str_version = 'v0.4.3'
 
-# BEGIN Calibration
-DBHOST = '127.0.0.1'
+#### BEGIN Calibration
+
+# DBHOST = '127.0.0.1'
+# DBPORT = 5432
+# DBNAME = 'bw_GBDirect_db'
+# DBUSERNAME = 'bw_tester_admin'
+# DBPASSWORD = '123456'
+
+DBHOST = '10.40.166.7'
 DBPORT = 5432
-DBNAME = 'bw_GBDirect_db'
-DBUSERNAME = 'bw_tester_admin'
+DBNAME = 'borgward_db'
+DBUSERNAME = 'borgward'
 DBPASSWORD = '123456'
 
 TIMER_OTA_MSG_TIMEOUT = 30
 LISTENING_VHL_PORT = 9201
 LISTENING_ADVISOR_PORT = 31029
-# END Calibration
+#### END Calibration
 
 # BEGIN debug
 
@@ -68,6 +75,7 @@ async def handle_advisor_connection(reader:asyncio.StreamReader, writer:asyncio.
 
 # BEGIN xTSPSimulator_MAIN
 def main(address2vhl='127.0.0.1', port2vhl=LISTENING_VHL_PORT, address2advisor='127.0.0.1', port2advisor=LISTENING_ADVISOR_PORT):
+
     global gDBhdl
     gDBhdl = connectdb(DBNAME,DBUSERNAME,DBPASSWORD,DBHOST,DBPORT)
 
@@ -78,14 +86,16 @@ def main(address2vhl='127.0.0.1', port2vhl=LISTENING_VHL_PORT, address2advisor='
 
     task = asyncio.gather(server2vhl_coro,server2advisor_coro)
     servers = loop.run_until_complete(task)
+
     print('{0}\tVehicle interface serving on {1}'.format(timestamp(),servers[0].sockets[0].getsockname()))
     print('{0}\tAdvisor interface serving on {1}'.format(timestamp(),servers[1].sockets[0].getsockname()))
+
     try:
         print('run loop')
         loop.run_forever()
     finally:
-        
         loop.close()
+
     for server in servers:
         server.close()
     gDBhdl['cursor'].close()

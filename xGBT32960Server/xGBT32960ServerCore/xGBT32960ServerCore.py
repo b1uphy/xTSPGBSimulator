@@ -59,6 +59,7 @@ class Vehicle:
             if result['code'] == 0:
                 msg = result['msg']
             else:
+                print('rx error msg in vehicle interface, code=',result['code'])
                 break        
             #处理响应消息
             result = self.processMsg(msg)        
@@ -201,8 +202,8 @@ class Vehicle:
         except OSError:
             print('Connection with vehicle broken!')
             result['code'] = 'Connection broken'
-        except:
-            print('ERROR: unhandled error in receive vehicle msg header')
+        except Exception as e:
+            print('ERROR: unhandled error in receive vehicle msg header,', e)
         else:
             if header:
                 #print('Received header {0}:\t{1}'.format(client,header.hex()))
@@ -227,8 +228,8 @@ class Vehicle:
                 except OSError:
                     print('WARNING: got connection error')
                     result['code'] = 'Connection broken'
-                except:
-                    print('ERROR: unhandled error in receive vehicle msg body')
+                except Exception as e:
+                    print('ERROR: unhandled error in receive vehicle msg body,', e)
                 else:
                     if data:
                         result['msg'] = header+data            
@@ -295,7 +296,10 @@ class Advisor:
                 break
             else:
                 print('Processing msg...')
-                self.processMsg(result['msg'])
+                if result['code'] == 0:
+                    self.processMsg(result['msg'])
+                else:
+                    print('rx error msg in vehicle interface, code=',result['code'])
             rxcounter +=1
 
             if xDEBUG:
@@ -330,12 +334,6 @@ class Advisor:
         header = None
         body = None
 
-        # header = await self.reader.readexactly(3)                
-
-        # length = int.from_bytes(header, byteorder='big')
-        # #print('length:{}'.format(length))
-
-        # body = await self.reader.readexactly(length)
         raw = await self.reader.readline()
         header =  raw[:3]          
         length = int.from_bytes(header, byteorder='big')
@@ -344,7 +342,6 @@ class Advisor:
         systime = time.time()
         if body:
             result['msg'] = body            
-            # writedb(result['msg'],systime,0,gDBhdl) 
             timestamp = time.strftime('%Y%m%d %H:%M:%S',time.localtime(systime))
             print('{0} Received from advisor {1}:\t{2}'.format(timestamp,self.client,result['msg'].decode('utf8'))) 
 
