@@ -842,13 +842,13 @@ class PayloadData(Field):
             print('rawleft=',raw.hex())
         return (cat,catdata,raw)
 
-class PlayloadBlank(Field):
-    def __init__(self):
-        super(PlayloadBlank,self).__init__('空数据',b'')
+class PayloadBlank(Field):
+    def __init__(self,raw:bytes):
+        super(PayloadBlank,self).__init__('空数据',raw)
 
-class PlayloadUnknown(Field):
+class PayloadUnknown(Field):
     def __init__(self, raw:bytes):
-        super(PlayloadUnknown,self).__init__('未知数据',raw)
+        super(PayloadUnknown,self).__init__('未知数据',raw)
         print('ERROR: you may need report the bug to tbox owner')
 
 class OTAGBData(Field):
@@ -873,7 +873,7 @@ class OTAGBData(Field):
                 except NameError as e:
                     print(e)
                     print('ERROR: Can not analyze the msg payload,msg raw=',msg.hex())
-                    payload = PlayloadUnknown(msg[24:-1])
+                    payload = PayloadUnknown(msg[24:-1])
 
             return [head,payload,chk]
 

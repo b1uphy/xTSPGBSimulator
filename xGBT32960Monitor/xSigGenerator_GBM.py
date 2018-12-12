@@ -240,8 +240,8 @@ class xGBT32960MonitorModel:
     #     self.sendMsg(eval(msg_logout))
 
     def destroy(self):
-        
-        self.sendMsg(eval(msg_disconnect_vehicle))
+        if self.binded:
+            self.sendMsg(eval(msg_disconnect_vehicle))
         self.sendMsg(eval(msg_logout))
         self.terminateFlag =True
         self.saveCfg()

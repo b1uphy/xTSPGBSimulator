@@ -2,6 +2,9 @@
 *.pyc
 *.xmind
 *.csv
-.build/*
 *.spec
 .dist/*
+.build/*
+build
+dist
+/xGBT32960Monitor/xmonitor.cfg
