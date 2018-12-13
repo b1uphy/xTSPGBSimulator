@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-12-13 15:41:08 by xw: v0.5.9.5 add collect time in the prefix of each log line
 # 2018-12-10 12:56:30 by xw: v0.5.9.4 optimize the color for longin msg in log window
 # 2018-12-10 11:36:37 by xw: v0.5.9.3 fix bug when in history mode, login/logout/msg is not update in the left panel, move collect time to right panel
 # 2018-12-08 00:13:49 by xw: v0.5.9.2 fix bug happened when user click disconnect button but server is not available
@@ -36,7 +37,7 @@
 # 13.增加错误信息显示界面
 xDEBUG = False
 
-str_Version = 'v0.5.9.4'
+str_Version = 'v0.5.9.5'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
@@ -382,7 +383,7 @@ class xGBT32960MonitorController():
 
     def setRTDataFrameModeToHistory(self,event):
         self.rtDataFrameMode = 'history'
-        gbraw = bytes.fromhex(self.view.logText.get('current linestart', 'current lineend')[20:].strip())
+        gbraw = bytes.fromhex(self.view.logText.get('current linestart', 'current lineend')[46:].strip())
         print('history gbraw=',gbraw.hex())
         try:
             gbobj = OTAGBData(gbraw)
@@ -543,7 +544,11 @@ class xGBT32960MonitorController():
         if xDEBUG:
             print('tag=',tag)
 
-        self.view.logText.insert(END,''.join([timestamp(),'\t']))
+        self.view.logText.insert(END,''.join([timestamp(),'>\t']))
+        if cmd in {'01','02','03','04'}:
+            self.view.logText.insert(END,''.join(['采集时间 ', gbobj.payload.phy[0].phy,'\t']))
+        else:
+            self.view.logText.insert(END,''.join(['采集时间 ', ' '*18,'\t']))
         self.view.logText.insert(END, ''.join([gbobj.raw.hex(),'\n']), tag)
 
         if self.view.logTextScrollYMode == 'auto':
