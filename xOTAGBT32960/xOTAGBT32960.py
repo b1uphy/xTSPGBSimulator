@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2018-12-14 10:02:09 by xw: 增加版本号
 # 2018-11-19 18:26:35 by xw: fixed a bug when analyzing GB Data 02
 # 2018-5-29 17:06:51 by xw: new created.
 
-str_version = 'v1.0'
+str_version = 'v0.1'
 
 import time
 
