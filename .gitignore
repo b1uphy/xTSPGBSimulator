@@ -3,8 +3,10 @@
 *.xmind
 *.csv
 *.spec
-.dist/*
-.build/*
-build
-dist
-/xGBT32960Monitor/xmonitor.cfg
+*.bat
+*.cmd
+*/log
+*/__pycache__
+*/build
+*/dist
+*/xmonitor.cfg
