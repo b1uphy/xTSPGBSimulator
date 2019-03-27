@@ -65,10 +65,10 @@ class xGBT32960MonitorModel:
         # self.createSocket()
         self.loadCfg()
 
-    def loadCfg(self,path=None):
-        if not path: path = ''
+    def loadCfg(self):
+
         try:
-            with open(path+CFGFILE,'r') as f:
+            with open(CFGFILE,'r') as f:
                 context = None
                 for line in f:
                     if '[' in line:

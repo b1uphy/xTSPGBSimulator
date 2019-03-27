@@ -41,8 +41,8 @@ LISTENING_ADVISOR_PORT = 31029
 # END debug 
 
 # BEGIN xTSPSimulator_TOP
+import argparse
 import sys
-
 import asyncio
 # import functools
 import time
@@ -74,15 +74,29 @@ async def handle_advisor_connection(reader:asyncio.StreamReader, writer:asyncio.
 # END xTSPSimulator_TOP
 
 # BEGIN xTSPSimulator_MAIN
-def main(address2vhl='127.0.0.1', port2vhl=LISTENING_VHL_PORT, address2advisor='127.0.0.1', port2advisor=LISTENING_ADVISOR_PORT):
+def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHost=DBHOST, dbPort=DBPORT):
+    if args.address:
+        address = args.address
+    else:
+        address = '127.0.0.1'
+
+    if args.vhlport:   
+        port2vhl = args.vhlport
+    else:
+        port2vhl = LISTENING_VHL_PORT
+
+    if args.advport:
+        port2advisor = args.advport
+    else:
+        port2advisor = LISTENING_ADVISOR_PORT
 
     global gDBhdl
-    gDBhdl = connectdb(DBNAME,DBUSERNAME,DBPASSWORD,DBHOST,DBPORT)
+    gDBhdl = connectdb(dbName,dbUserName,dbPassword,dbHost,dbPort)
 
     loop = asyncio.get_event_loop()
 
-    server2vhl_coro = asyncio.start_server(handle_vehicle_connection, address2vhl, port2vhl, loop=loop)
-    server2advisor_coro = asyncio.start_server(handle_advisor_connection, address2advisor, port2advisor, loop=loop)
+    server2vhl_coro = asyncio.start_server(handle_vehicle_connection, address, port2vhl, loop=loop)
+    server2advisor_coro = asyncio.start_server(handle_advisor_connection, address, port2advisor, loop=loop)
 
     task = asyncio.gather(server2vhl_coro,server2advisor_coro)
     servers = loop.run_until_complete(task)
@@ -103,6 +117,12 @@ def main(address2vhl='127.0.0.1', port2vhl=LISTENING_VHL_PORT, address2advisor='
     print('Server shut down.')
 
 if __name__ == '__main__':
-    main(*sys.argv[1:])  # <10>
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--address", help='serving IP address', type=str, default='127.0.0.1')
+    parser.add_argument("--vhlport", type=int, help="the tcp port number for vehicle connection", default=9201)
+    parser.add_argument("--advport", type=int, help="the tcp port number for advisor client connection", default=31029)
+    args = parser.parse_args()
+
+    # main(address=address, port2vhl=vhlport, port2advisor=advport)  # <10>
+    main(args)
 # END xTSPSimulator_MAIN

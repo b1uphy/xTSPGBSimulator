@@ -49,7 +49,7 @@ from tkinter.ttk import *
 
 from threading import Thread
 
-#import icon resource
+# import icon resource
 import base64,eks
 with open('tmpicon.ico','wb+') as tmp:
     tmp.write(base64.b64decode(eks.img))
@@ -606,6 +606,12 @@ class xGBT32960MonitorController():
         print('exit Controller rxloop')
 
 if __name__ == '__main__':
+
+    # 隐藏窗口
+    whnd = ctypes.windll.kernel32.GetConsoleWindow()    
+    if whnd != 0:    
+        ctypes.windll.user32.ShowWindow(whnd, 0)    
+        ctypes.windll.kernel32.CloseHandle(whnd) 
 
     app=xGBT32960MonitorController()
     print('Program Exit')
