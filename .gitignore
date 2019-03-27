@@ -6,8 +6,8 @@
 *.bat
 *.cmd
 */.vscode
-*/log
-*/__pycache__
-*/build
-*/dist
 */xmonitor.cfg
+log
+build
+dist
+__pycache__
