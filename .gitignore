@@ -5,6 +5,7 @@
 *.spec
 *.bat
 *.cmd
+*/.vscode
 */log
 */__pycache__
 */build
