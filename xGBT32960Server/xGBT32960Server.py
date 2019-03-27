@@ -47,6 +47,7 @@ import asyncio
 # import functools
 import time
 import json
+import socket
 from async_timeout import timeout
 
 from xGBT32960ServerCore.xDBService import connectdb
@@ -78,7 +79,11 @@ def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHo
     if args.address:
         address = args.address
     else:
-        address = '127.0.0.1'
+        try:
+            address = socket.gethostbyname(socket.gethostname())
+        except:
+            print('use default address 127.0.0.1')
+            address = '127.0.0.1'
 
     if args.vhlport:   
         port2vhl = args.vhlport
@@ -118,11 +123,10 @@ def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHo
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--address", help='serving IP address', type=str, default='127.0.0.1')
+    parser.add_argument("--address", help='serving IP address', type=str)
     parser.add_argument("--vhlport", type=int, help="the tcp port number for vehicle connection", default=9201)
     parser.add_argument("--advport", type=int, help="the tcp port number for advisor client connection", default=31029)
     args = parser.parse_args()
 
-    # main(address=address, port2vhl=vhlport, port2advisor=advport)  # <10>
     main(args)
 # END xTSPSimulator_MAIN
