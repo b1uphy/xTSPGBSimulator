@@ -14,7 +14,7 @@
 # TODO: 
 # 
 
-str_version = 'v0.4.3'
+str_version = 'v0.5'
 
 #### BEGIN Calibration
 
@@ -122,6 +122,7 @@ def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHo
     print('Server shut down.')
 
 if __name__ == '__main__':
+    print(f'Welcome to use xTSPGBServer version {str_version}')
     parser = argparse.ArgumentParser()
     parser.add_argument("--address", help='serving IP address', type=str)
     parser.add_argument("--vhlport", type=int, help="the tcp port number for vehicle connection", default=9201)
