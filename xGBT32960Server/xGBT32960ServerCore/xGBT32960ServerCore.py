@@ -32,7 +32,7 @@ import base64
 
 from .xDBService import writedb
 from .xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime
-from .GB_PARSER_HANDLER import parseGBPkgs
+
 # BEGIN APP Layer/
 class Vehicle:
     def __init__(self,reader,writer,dbhdl):
