@@ -2,6 +2,7 @@
 # -*- coding: utf8 -*-
 # bluphy@163.com
 
+# 2019-04-01 15:10:00 by xw: v0.5.1 Use f-string to print timestamp. 
 # 2018-12-03 15:26:33 by xw: v0.4.3 Fix some bug if the received VIN is not ASCII character
 # 2018-10-31 16:28:08 by xw: v0.4.2 Rename the advisor register/unregister function to bindVhl and unbindVhl, fix a bug when unbind vehicle
 # 2018-10-31 16:38:49 by xw: v0.4.1 Update version number
@@ -9,12 +10,12 @@
 # 2018-10-29 11:20:58 by xw: v0.3.1 更新xGBT32960ServerCore，处理advisor interface接收消息格式错误"
 # 2018-10-26 17:08:06 by xw: v0.3 更新Vehicle类，简化server架构，使vehicle interface和advisor interface结构统一
 # 2018-10-17 11:32:06 by xw: v0.2 拆分应用层部分到单独文件，增加应用层日志功能
-# 2018-05-24 16:52 by xw: new created.
+# 2018-05-24 16:52:00 by xw: new created.
 
 # TODO: 
 # 
 
-str_version = 'v0.5'
+str_version = 'v0.5.1'
 
 #### BEGIN Calibration
 
@@ -51,8 +52,8 @@ import socket
 from async_timeout import timeout
 
 from xGBT32960ServerCore.xDBService import connectdb
-from xGBT32960ServerCore.xGBT32960ServerCore import Vehicle,Advisor,xDEBUG
 from xGBT32960ServerCore.xOTAGBT32960 import timestamp
+from xGBT32960ServerCore.xGBT32960ServerCore import Vehicle, Advisor
 
 gDBhdl = None
 
@@ -60,7 +61,7 @@ async def handle_vehicle_connection(reader, writer):
     global gDBhdl
     vhl = Vehicle(reader,writer,gDBhdl)
     await vhl.startloop()
-    print('Close the connection with vehicle VIN={0}'.format(vhl.VIN))
+    print(f'{timestamp()}\tClose the connection with vehicle VIN={vhl.VIN}')
     vhl.destroy()
     vhl = None
 
@@ -68,7 +69,7 @@ async def handle_vehicle_connection(reader, writer):
 async def handle_advisor_connection(reader:asyncio.StreamReader, writer:asyncio.StreamWriter):
     advisor = Advisor(reader,writer)
     await advisor.startloop()
-    print('Close the connection with advisor:{0}'.format(advisor.username))
+    print(f'{timestamp()}\tClose the connection with advisor:{advisor.username}')
     advisor.destroy()
     advisor = None
     
@@ -82,7 +83,7 @@ def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHo
         try:
             address = socket.gethostbyname(socket.gethostname())
         except:
-            print('use default address 127.0.0.1')
+            print(f'{timestamp()}\tUse default address 127.0.0.1')
             address = '127.0.0.1'
 
     if args.vhlport:   
@@ -106,11 +107,11 @@ def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHo
     task = asyncio.gather(server2vhl_coro,server2advisor_coro)
     servers = loop.run_until_complete(task)
 
-    print('{0}\tVehicle interface serving on {1}'.format(timestamp(),servers[0].sockets[0].getsockname()))
-    print('{0}\tAdvisor interface serving on {1}'.format(timestamp(),servers[1].sockets[0].getsockname()))
+    print(f'{timestamp()}\tVehicle interface serving on {servers[0].sockets[0].getsockname()}')
+    print(f'{timestamp()}\tAdvisor interface serving on {servers[1].sockets[0].getsockname()}')
 
     try:
-        print('run loop')
+        print(f'{timestamp()}\tRun async event loop.')
         loop.run_forever()
     finally:
         loop.close()

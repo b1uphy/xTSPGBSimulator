@@ -31,13 +31,13 @@ from async_timeout import timeout
 import base64
 
 from .xDBService import writedb
-from .xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime
+from .xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,timestamp
 
 # BEGIN APP Layer/
 class Vehicle:
     def __init__(self,reader,writer,dbhdl):
         self.client = writer.get_extra_info('peername')
-        print('Vehicle {} connected.'.format(self.client))
+        print(f'{timestamp()}\tVehicle {self.client} connected.')
         self.reader = reader
         self.writer = writer
         self.db = dbhdl
@@ -52,14 +52,14 @@ class Vehicle:
         while True:  # <4>
             counter += 1
             print('counter=',counter)
-            print(self.client,' Waiting msg...')
+            print(self.client,f'{timestamp()}\tWaiting msg...')
 
             #处理接收消息
             result = await self.receiveMsg()
             if result['code'] == 0:
                 msg = result['msg']
             else:
-                print('rx error msg in vehicle interface, code=',result['code'])
+                print(f'{timestamp()}\tRx error msg in vehicle interface, code=',result['code'])
                 break        
             #处理响应消息
             result = self.processMsg(msg)        
@@ -77,14 +77,14 @@ class Vehicle:
         self.data = OTAGBData(msg)
 
         if xDEBUG:
-            print('rx vehicle msg:')
+            print(f'{timestamp()}\tRx vehicle msg:')
             self.data.printself()
 
         if self.VIN:
             #当不是连接后的第一条消息时
             if self.VIN != self.data.head.VIN.phy:
                 self.VIN = self.data.head.VIN.phy
-                print('VIN is not match')
+                print(f'{timestamp()}\tVIN is not match')
         else:
             #TCP连接后的第一条消息
             self.VIN = self.data.head.VIN.phy
@@ -93,7 +93,7 @@ class Vehicle:
         
         if self.data.head.cmd.phy == '车辆登入':
             self.state = 'Login'
-            print('Vehicle login: VIN = ',self.VIN)
+            print(f'{timestamp()}\tVehicle login: VIN = {self.VIN}')
             result = self.responseLogin()
 
         elif self.data.head.cmd.phy == '实时数据' or self.data.head.cmd.phy == '补发数据':
@@ -114,13 +114,13 @@ class Vehicle:
             pass
 
         elif self.data.head.cmd.phy == '车辆登出':
-            print('Vehicle logout: VIN = ',self.VIN)
+            print(f'{timestamp()}\tVehicle logout: VIN = {self.VIN}',)
             result = self.responseLogout()
 
         elif self.data.head.cmd.phy == '心跳':
             result = self.responseHeartbeat()
         else:
-            print('Error CMD')
+            print(f'{timestamp()}\tError CMD')
             result['code'] = 'Error CMD'
 
         self.forward2Advisor(self.msg)
@@ -131,10 +131,10 @@ class Vehicle:
     def responseLogin(self):
         result = {'msg':None, 'code':0}
         if xDEBUG:
-            print('data payload')
+            print(f'{timestamp()}\tData payload')
             print(self.data.payload.phy)
         result['msg'] = createOTAGBMsg(b'\x01', b'\x01', self.VIN, 1, genGBTime()+self.data.payload.raw[6:])
-        print("response result['msg']",result['msg'])
+        print(f"{timestamp()}\tResponse {result['msg']}")
         return result
 
     def responseLogout(self):
@@ -161,7 +161,7 @@ class Vehicle:
             with open('log\\'+self.logname,'a') as log:
                 log.write(rxtime+gbdatas+'\n')
         except IOError:
-            print('[Warning] : write log fail {0} -> {1}'.format(rxtime,gbdatas))
+            print(f'{timestamp()}\tWARNING: write log fail {rxtime} -> {gbdatas}')
 
     def register(self):
         try:
@@ -169,7 +169,7 @@ class Vehicle:
         except KeyError:
             gVIN_Vhl_Advisor_Mapping[self.VIN] = {}
         finally:
-            print('register vehicle {0}'.format(self.VIN))
+            print(f'{timestamp()}\tRegister vehicle {self.VIN}')
             gVIN_Vhl_Advisor_Mapping[self.VIN]['vhl'] = self
 
     def createGBT32960Msg(self,msg):
@@ -185,7 +185,7 @@ class Vehicle:
             if self.advisor:
                 self.advisor.putVhlMsg(self.createGBT32960Msg(msg))
                 if xDEBUG:
-                    print('forward2Advisor') 
+                    print(f'{timestamp()}\tForward2Advisor') 
 
     async def receiveMsg(self)->bytes:
         result = {'msg':None, 'code':-1}
@@ -196,14 +196,14 @@ class Vehicle:
                 header = await self.reader.readexactly(24)
                 
         except asyncio.TimeoutError:
-            print('Rx timeout')
-            print('Close connection with vehicle because of timeout')
+            print(f'{timestamp()}\tRx timeout')
+            print(f'{timestamp()}\tClose connection with vehicle because of timeout')
             result['code'] = 'Timeout!'    
         except OSError:
-            print('Connection with vehicle broken!')
+            print(f'{timestamp()}\tConnection with vehicle VIN: {self.VIN} broken!')
             result['code'] = 'Connection broken'
         except Exception as e:
-            print('ERROR: unhandled error in receive vehicle msg header,', e)
+            print(f'{timestamp()}\tERROR: unhandled error in receive vehicle msg header,', e)
         else:
             if header:
                 #print('Received header {0}:\t{1}'.format(client,header.hex()))
@@ -216,26 +216,23 @@ class Vehicle:
                 try:
                     async with timeout(TIMER_OTA_MSG_TIMEOUT):
                         data = await self.reader.readexactly(length)
-                    systime = time.time()
-                except asyncio.TimeoutError:
-                    
-                    print('Rx timeout')
-                    print('Close connection because of timeout')
+                except asyncio.TimeoutError:                   
+                    print(f'{timestamp()}\tRx timeout')
+                    print(f'{timestamp()}\tClose connection because of timeout')
                     result['code'] = 'Timeout!'
                 except asyncio.IncompleteReadError as err:
-                    print('WARNING: wrong msg format ',err)
-
+                    print(f'{timestamp()}\tWARNING: wrong msg format {err}')
                 except OSError:
-                    print('WARNING: got connection error')
+                    print(f'{timestamp()}\tWARNING: got connection error')
                     result['code'] = 'Connection broken'
                 except Exception as e:
-                    print('ERROR: unhandled error in receive vehicle msg body,', e)
+                    print(f'{timestamp()}\tERROR: unhandled error in receive vehicle msg body,{e}')
                 else:
                     if data:
                         result['msg'] = header+data            
-                        writedb(result['msg'],systime,0,self.db)
-                        timestamp = time.strftime('%Y%m%d %H:%M:%S',time.localtime(systime))
-                        print('{0} Received from vehicle {1}:\t{2}'.format(timestamp,self.client,result['msg'].hex().upper()))  # <10>
+                        writedb(result['msg'],time.time(),0,self.db)
+                        
+                        print(f"{timestamp()}\tReceived from vehicle {self.client}:\t{result['msg'].hex().upper()}")  
                         result['code'] = 0
 
         return result
@@ -244,16 +241,16 @@ class Vehicle:
         try:
             self.writer.write(msg)        
         except OSError:
-            print('Send Msg to vehicle fail -> Msg:',msg.hex())
+            print(f'{timestamp()}\tSend Msg to vehicle fail -> Msg:{msg.hex()}')
         else:
             systime = time.time()
             writedb(msg,systime,1,self.db)
-            print('Send Msg to vehicle:',msg.hex())
+            print(f'{timestamp()}\tSend Msg to vehicle: {msg.hex()}')
 
 class Advisor:
     def __init__(self,reader,writer):
         self.client = writer.get_extra_info('peername')
-        print('Client {} connected as advisor.'.format(self.client))
+        print(f'{timestamp()}\tClient {self.client} connected as advisor')
         self.VIN = '' # str
         self.username = None #str
         self.msg = None # bytes
@@ -275,75 +272,77 @@ class Advisor:
 
     async def startloop(self):
         if xDEBUG:
-            print('Start advisor subloop')
-            print('Advisor {0} counter=xxx'.format(self.username))
+            print(f'{timestamp()}\tStart advisor subloop')
+            print(f'{timestamp()}\tAdvisor {self.username} counter=xxx')
 
-        done,pending = await wait([self.rxloop(),self.txloop()])
+        done, pending = await wait([self.rxloop(),self.txloop()])
         for f in pending:
             f.cancel()
         if xDEBUG:
-            print('End advisor subloop')
+            print(f'{timestamp()}\tEnd advisor subloop')
        
 
     async def rxloop(self):
         if xDEBUG:
-            print('run rxloop')
+            print(f'{timestamp()}\tRun advisor rxloop')
         rxcounter = 0
         while True:
             try:
                 result = await self.receiveMsg()
-            except OSError:   
+            except OSError as e:
+                print(f'{timestamp()}\tERROR: {e}')
                 break
             else:
-                print('Processing msg...')
+                print(f'{timestamp()}\tProcessing msg...')
                 if result['code'] == 0:
                     self.processMsg(result['msg'])
                 else:
-                    print('rx error msg in vehicle interface, code=',result['code'])
+                    print(f"{timestamp()}\tRx error msg in vehicle interface, code = {result['code']}")
             rxcounter +=1
 
             if xDEBUG:
-                print('Advisor {0} rx counter {1}'.format(self.username,rxcounter))
+                print(f'{timestamp()}\tAdvisor {self.username} rx counter {rxcounter}')
             # if self.terminateFlag: break
 
     async def txloop(self):
         if xDEBUG:
-            print('run txloop')
+            print(f'{timestamp()}\tRun advisor {self.username} txloop')
         txcounter = 0
         while True:
             msg = await self.outputQueue.get()
-            timestamp = time.strftime('%Y%m%d %H:%M:%S')
-
+            
             try:
                 result = await self.sendMsg(msg)
             except OSError:
-                print('{0} Send Msg to advisor {1} fail: {2}'.format(timestamp,self.username,msg.hex()))
+                print(f'{timestamp()}\tFail to send Msg to advisor {self.username}: {msg.hex()}')
                 break
             else:
-                print('{0} Send Msg to advisor {1}: {2}'.format(timestamp,self.username,msg.hex()))
+                print(f'{timestamp()}\tSend Msg to advisor {self.username}: {msg.hex()}')
             finally:
                 txcounter += 1
 
                 if xDEBUG:
-                    print(result['code'])
-                    print('Advisor {0} tx counter {1}'.format(self.username,txcounter))            
+                    print(f"{timestamp()}\tSend result is Code {result['code']}")
+                    print(f'{timestamp()}\tAdvisor {self.username} tx counter {txcounter}')            
             
     async def receiveMsg(self,timeout=-1):
+        if xDEBUG:
+            print(f'{timestamp()}\tReceiving msg from advisor {self.username}')
+
         result = {'msg':None, 'code':0}
-        raw = None
-        header = None
-        body = None
+        # raw = None
+        # header = None
+        # body = None
 
         raw = await self.reader.readline()
-        header =  raw[:3]          
-        length = int.from_bytes(header, byteorder='big')
+        # header =  raw[:3]         #Should used for check msg format 
+        # length = int.from_bytes(header, byteorder='big')
         body = raw[3:-1]
 
-        systime = time.time()
         if body:
             result['msg'] = body            
-            timestamp = time.strftime('%Y%m%d %H:%M:%S',time.localtime(systime))
-            print('{0} Received from advisor {1}:\t{2}'.format(timestamp,self.client,result['msg'].decode('utf8'))) 
+           
+            print(f"{timestamp()}\tReceived from advisor {self.client}:\t{result['msg'].decode('utf8')}") 
 
         return result
 
@@ -379,7 +378,7 @@ class Advisor:
     def destroy(self):
         self.unbindVhl()
         self.writer.close()
-        print('Advisor {0} disconnected'.format(self.username))
+        print(f'{timestamp()}\tAdvisor {self.username} disconnected')
 
     def bindVhl(self):       
         try:
@@ -387,16 +386,16 @@ class Advisor:
         except KeyError:
             gVIN_Vhl_Advisor_Mapping[self.VIN] = {}
         finally:
-            print('bind advisor {0} to vehicle {1}'.format(self.username,self.VIN))
+            print(f'{timestamp()}\tBind advisor {self.username} to vehicle {self.VIN}')
             gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor'] = self
 
     def unbindVhl(self):
         try:
             gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor']
         except KeyError:
-            print("advisor {0} NOT bind with vehicle yet")
+            print(f'{timestamp()}\tAdvisor {self.username} NOT bind with vehicle yet')
         else:
-            print('unbind advisor {0} to vehicle {1}'.format(self.username,self.VIN))  
+            print(f'{timestamp()}\tUnbind advisor {self.username} to vehicle {self.VIN}')  
             gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor'] = None 
             self.VIN = ''
 
@@ -404,12 +403,12 @@ class Advisor:
         self.username = msgobj['data']['username']
         self.replyOK(msgobj)
 
-        print('advisor {0} login'.format(self.username))
+        print(f'{timestamp()}\tAdvisor {self.username} login')
 
     def selectVhl(self,msgobj):
         self.unbindVhl()
         self.VIN = msgobj['data']['VIN']
-        print('advisor {0} select vehicle {1}'.format(self.username,self.VIN))
+        print(f'{timestamp()}\tAdvisor {self.username} select vehicle {self.VIN}')
         self.bindVhl()
         self.replyOK(msgobj)
 
@@ -418,7 +417,7 @@ class Advisor:
         self.replyOK(msgobj)
 
     def echo(self,msgobj):
-        replydata = 'Advisor is {0}, selected vehicle {1}'.format(self.username,self.VIN)
+        replydata = f'{timestamp()}\tAdvisor is {self.username}, selected vehicle {self.VIN}'
         self.replyOKWithData(msgobj,replydata)
         print(replydata)
 
@@ -427,11 +426,14 @@ class Advisor:
         self.destroy()
         
     def processMsg(self,msg:bytes):
+        if xDEBUG:
+            print(f'{timestamp()}\tProcessing msg to advisor {self.username}')
+
         result = {'msg':None, 'code':0}
         try:
             msgobj = json.loads(msg.decode('utf8'))
         except UnicodeError as e:
-            print('WARNING: advisor msg format is not good,',e)
+            print( f'{timestamp()}\tWARNING: advisor msg format is not good,{e}')
         else:
             if type(msgobj) == dict:
                 if msgobj['name'] == 'login':
@@ -443,7 +445,7 @@ class Advisor:
                 elif msgobj['name'] == 'echo':
                     self.echo(msgobj)
             else:
-                print('WARNING: msg format error : {0}'.format(msg.hex()))
+                print( f'{timestamp()}\tWARNING: msg format error : {msg.hex()}')
 
         return result
 
