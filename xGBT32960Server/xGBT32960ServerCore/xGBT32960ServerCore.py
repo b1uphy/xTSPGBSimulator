@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-03 15:11:00 by xw: Fix bug when VIN is changed of the connected vehicle
 # 2019-04-03 12:30:00 by xw: Add feature to reply connected vehicles to advisor client.
 # 2018-12-06 15:47:43 by xw: delay some time after vehicle send logout msg
 # 2018-12-06 15:26:25 by xw: handle an unicode error from advisor msg
@@ -43,7 +44,7 @@ def getConnectedVehicles():
                 VINs.append(VIN)
         except KeyError:
             pass
-            
+
     return VINs
 
 # BEGIN APP Layer/
@@ -96,8 +97,11 @@ class Vehicle:
         if self.VIN:
             #当不是连接后的第一条消息时
             if self.VIN != self.data.head.VIN.phy:
+                print(f'{timestamp()}\tWARNING: VIN is not match')
+                self.unregister() #老VIN取消注册
                 self.VIN = self.data.head.VIN.phy
-                print(f'{timestamp()}\tVIN is not match')
+                self.logname = '{0}_{1}.csv'.format(self.VIN,time.strftime('%Y%m%d%H%M%S'))
+                self.register() #重新注册新的VIN
         else:
             #TCP连接后的第一条消息
             self.VIN = self.data.head.VIN.phy

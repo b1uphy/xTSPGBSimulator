@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-03 14:54:00 by xw: 增加处理无法解析VIN时的处理逻辑
 # 2018-12-14 10:02:09 by xw: 增加版本号
 # 2018-11-19 18:26:35 by xw: fixed a bug when analyzing GB Data 02
 # 2018-5-29 17:06:51 by xw: new created.
 
-str_version = 'v0.1'
+str_version = 'v0.2'
 
 import time
 
@@ -184,7 +185,7 @@ class Head(Field):
             try:
                 VIN = Field('VIN', header[4:21],convertfunc=lambda x: x.decode('ascii'))
             except UnicodeDecodeError:
-                print(f'{timestamp}\tWARNING: 无法解析VIN码，使用全F代替')
+                print(f'{timestamp()}\tWARNING: 无法解析VIN码，使用全F代替')
                 VIN = Field('VIN', b'F'*17, convertfunc=lambda x: x.decode('ascii'))
 
             secretflg = Field('加密方式', header[21])
