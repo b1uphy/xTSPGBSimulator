@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
-# 2019-04-03 12:30:00 by xw: Add feature to support multi advisor cilent connect to a same vehicle.
+# 2019-04-03 16:37:00 by xw: Fix a bug when reply advisor client a reply msg has a timestamp prefix by mistake
+# 2019-04-03 16:30:00 by xw: Add feature to support multi advisor cilent connect to a same vehicle.
 # 2019-04-03 15:11:00 by xw: Fix bug when VIN is changed of the connected vehicle
 # 2019-04-03 12:30:00 by xw: Add feature to reply connected vehicles to advisor client.
 # 2018-12-06 15:47:43 by xw: delay some time after vehicle send logout msg
@@ -454,7 +455,7 @@ class Advisor:
         self.replyOK(msgobj)
 
     def echo(self,msgobj):
-        replydata = f'{timestamp()}\tAdvisor is {self.username}, selected vehicle {self.VIN}'
+        replydata = f'Advisor is {self.username}, selected vehicle {self.VIN}'
         self.replyOKWithData(msgobj,replydata)
         print(replydata)
 
