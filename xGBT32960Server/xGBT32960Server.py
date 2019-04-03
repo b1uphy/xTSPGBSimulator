@@ -2,6 +2,7 @@
 # -*- coding: utf8 -*-
 # bluphy@163.com
 
+# 2019-04-03 12:30:00 by xw: v0.5.2 Add feature to reply connected vehicles to advisor client.
 # 2019-04-01 15:10:00 by xw: v0.5.1 Use f-string to print timestamp. 
 # 2018-12-03 15:26:33 by xw: v0.4.3 Fix some bug if the received VIN is not ASCII character
 # 2018-10-31 16:28:08 by xw: v0.4.2 Rename the advisor register/unregister function to bindVhl and unbindVhl, fix a bug when unbind vehicle
@@ -15,7 +16,7 @@
 # TODO: 
 # 
 
-str_version = 'v0.5.1'
+str_version = 'v0.5.2'
 
 #### BEGIN Calibration
 

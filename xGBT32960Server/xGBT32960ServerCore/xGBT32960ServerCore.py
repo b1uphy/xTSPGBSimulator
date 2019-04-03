@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-03 12:30:00 by xw: Add feature to reply connected vehicles to advisor client.
 # 2018-12-06 15:47:43 by xw: delay some time after vehicle send logout msg
 # 2018-12-06 15:26:25 by xw: handle an unicode error from advisor msg
 # 2018-10-16 14:11:02 by xw: new created.
@@ -32,6 +33,18 @@ import base64
 
 from .xDBService import writedb
 from .xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,timestamp
+
+def getConnectedVehicles():
+    global gVIN_Vhl_Advisor_Mapping
+    VINs = []
+    for VIN in gVIN_Vhl_Advisor_Mapping.keys():
+        try:
+            if gVIN_Vhl_Advisor_Mapping[VIN]['vhl'] != None:
+                VINs.append(VIN)
+        except KeyError:
+            pass
+            
+    return VINs
 
 # BEGIN APP Layer/
 class Vehicle:
@@ -172,6 +185,15 @@ class Vehicle:
             print(f'{timestamp()}\tRegister vehicle {self.VIN}')
             gVIN_Vhl_Advisor_Mapping[self.VIN]['vhl'] = self
 
+    def unregister(self):
+        try:
+            gVIN_Vhl_Advisor_Mapping[self.VIN]['vhl'] = None
+            
+        except KeyError:
+            print(f"VIN: {self.VIN} is not registered")
+        else:
+            print(f"VIN: {self.VIN} is unregistered")
+
     def createGBT32960Msg(self,msg):
         return json.dumps({'name':'gbdata','data':base64.standard_b64encode(msg).decode('ascii')}).encode('utf8')
 
@@ -198,10 +220,12 @@ class Vehicle:
         except asyncio.TimeoutError:
             print(f'{timestamp()}\tRx timeout')
             print(f'{timestamp()}\tClose connection with vehicle because of timeout')
-            result['code'] = 'Timeout!'    
+            result['code'] = 'Timeout!'
+            self.unregister()    
         except OSError:
             print(f'{timestamp()}\tConnection with vehicle VIN: {self.VIN} broken!')
             result['code'] = 'Connection broken'
+            self.unregister()
         except Exception as e:
             print(f'{timestamp()}\tERROR: unhandled error in receive vehicle msg header,', e)
         else:
@@ -220,11 +244,13 @@ class Vehicle:
                     print(f'{timestamp()}\tRx timeout')
                     print(f'{timestamp()}\tClose connection because of timeout')
                     result['code'] = 'Timeout!'
+                    self.unregister()
                 except asyncio.IncompleteReadError as err:
                     print(f'{timestamp()}\tWARNING: wrong msg format {err}')
                 except OSError:
                     print(f'{timestamp()}\tWARNING: got connection error')
                     result['code'] = 'Connection broken'
+                    self.unregister()
                 except Exception as e:
                     print(f'{timestamp()}\tERROR: unhandled error in receive vehicle msg body,{e}')
                 else:
@@ -424,16 +450,22 @@ class Advisor:
     def logout(self,msgobj):
         self.replyOK(msgobj)
         self.destroy()
-        
+
+    def showConnectedVehicles(self, msgobj):
+        print(f"{timestamp()}\tReceive command {msgobj['name']}")
+        replydata = ','.join(getConnectedVehicles())
+        print(f"{timestamp()}\tConnected vehicles:{replydata}")
+        self.replyOKWithData(msgobj, replydata)
+
     def processMsg(self,msg:bytes):
         if xDEBUG:
-            print(f'{timestamp()}\tProcessing msg to advisor {self.username}')
+            print(f"{timestamp()}\tProcessing msg to advisor {self.username}")
 
         result = {'msg':None, 'code':0}
         try:
             msgobj = json.loads(msg.decode('utf8'))
         except UnicodeError as e:
-            print( f'{timestamp()}\tWARNING: advisor msg format is not good,{e}')
+            print( f"{timestamp()}\tWARNING: advisor msg format is not good,{e}")
         else:
             if type(msgobj) == dict:
                 if msgobj['name'] == 'login':
@@ -444,6 +476,8 @@ class Advisor:
                     self.disconnect_vehicle(msgobj)
                 elif msgobj['name'] == 'echo':
                     self.echo(msgobj)
+                elif msgobj['name'] == 'show_connected_vehicles':
+                    self.showConnectedVehicles(msgobj)
             else:
                 print( f'{timestamp()}\tWARNING: msg format error : {msg.hex()}')
 

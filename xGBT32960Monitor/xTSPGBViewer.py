@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-03 14:12:00 by xw: v0.6.0 VIN combobox dropdown will show the connected vehicles list
 # 2018-12-13 15:41:08 by xw: v0.5.9.5 add collect time in the prefix of each log line
 # 2018-12-10 12:56:30 by xw: v0.5.9.4 optimize the color for longin msg in log window
 # 2018-12-10 11:36:37 by xw: v0.5.9.3 fix bug when in history mode, login/logout/msg is not update in the left panel, move collect time to right panel
@@ -35,15 +36,14 @@
 # done 11.增加log配色 登入、登出、实时、补发、1、2、3级报警 (need verify for 补发和报警)
 # done 12.log增加接收时间
 # 13.增加错误信息显示界面
+# 14.多用户同时连接同一车辆
+# 15.显示已连接到服务器车辆列表
 xDEBUG = False
 
-str_Version = 'v0.5.9.5'
+str_Version = 'v0.6.0'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
-# sys.path.append(sys.path[0].rsplit('\\',1)[0])
-# print(sys.path)
-# import xDBService.xDBService as xdbs
 from tkinter import *
 from tkinter.ttk import *
 
@@ -81,6 +81,12 @@ class xGBT32960MonitorView():
         goemtrystr = '{0}x{1}+{2}+{3}'.format(xWIDTH,xHEIGHT,OFFSET_X,OFFSET_Y)
         self.root.geometry(goemtrystr)
 
+        text_font = ('Consolas', '10')
+        # main_frame = tk.Frame(root, bg='gray')                  # main frame
+        # combo_box = ttk.Combobox(main_frame, font=text_font)    # apply font to combobox
+        # entry_box = ttk.Entry(main_frame, font=text_font)       # apply font to entry
+        self.root.option_add('*TCombobox*Listbox.font', text_font)   # apply font to combobox list
+
         self.frame = Frame(self.root)
         self.frame.grid(row=0,rowspan=1,column=0,columnspan=1,sticky='nesw')
         self.frame.rowconfigure(20,weight=1)
@@ -97,10 +103,13 @@ class xGBT32960MonitorView():
         self.vhlInfoFrame = Frame(self.vhlViewFrame)
         self.vhlInfoFrame.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
 
+        # self.cbStyle = Style()
+        # self.cbStyle.configure('ComboboxMonospaced.TCombobox', font=('Consolas', '12'))
+
         self.hostLbl = Label(self.vhlInfoFrame,text='Server')
         self.hostLbl.grid(row=5,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         self.host = StringVar()
-        self.hostCombobox = Combobox(self.vhlInfoFrame,textvariable=self.host)
+        self.hostCombobox = Combobox(self.vhlInfoFrame,textvariable=self.host, font=text_font)
         self.hostCombobox.grid(row=5,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
 
         self.connectingActionStrVar = StringVar()
@@ -111,9 +120,10 @@ class xGBT32960MonitorView():
         self.VINLbl = Label(self.vhlInfoFrame,text='Vehicle')
         self.VINLbl.grid(row=10,rowspan=1,column=10,columnspan=1,sticky=N+S+E+W)
         self.VIN = StringVar()
-        self.VINCombobox = Combobox(self.vhlInfoFrame,textvariable=self.VIN)
-        self.VINCombobox.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
 
+        self.VINCombobox = Combobox(self.vhlInfoFrame,textvariable=self.VIN, font=text_font)
+        self.VINCombobox.grid(row=10,rowspan=1,column=20,columnspan=1,sticky=N+S+E+W)
+        
         self.bindingActionStrVar = StringVar()
         self.bindingActionStrVar.set('Bind')        
         self.toggleBindingBtn = Button(self.vhlInfoFrame,textvariable=self.bindingActionStrVar)
@@ -160,8 +170,6 @@ class xGBT32960MonitorView():
         self.logoutTime= StringVar()
         self.logoutTimeValueLbl = Label(self.vhlLoggingInfoFrame,textvariable=self.logoutTime)
         self.logoutTimeValueLbl.grid(row=20,rowspan=1,column=40,columnspan=1,sticky=N+S+E+W)
-
-
 
         self.heartbeatTime = StringVar()
         self.heartbeatLbl = Label(self.vhlLoggingInfoFrame,text='心跳报文:')
@@ -317,6 +325,7 @@ class xGBT32960MonitorController():
         self.view.logText.bind('<ButtonRelease-1>',self.setRTDataFrameModeToHistory)  #左键单击进入历史分析模式
         self.view.logText.bind('<ButtonRelease-3>',self.setRTDataFrameModeToRealtime)  #右键单击返回实时模式
 
+        self.bindingActionStrVar = StringVar()
         self.view.host.set(self.model.configs['host'])
         self.view.hostCombobox.configure(values=self.model.configsHistory['hostHistory'])
         self.view.hostCombobox.configure(postcommand=self.updateHostDropDown)
@@ -344,7 +353,9 @@ class xGBT32960MonitorController():
         self.view.hostCombobox.configure(values=self.model.configsHistory['hostHistory'])
 
     def updateVINDropDown(self):
-        self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
+        print('DDEBUG: update VINDropDown')
+        self.model.sendMsg(eval(msg_show_connected_vehicles))
+        # self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
 
     def getVhlConnectingStatus(self):
         return 'To Be Implement'
@@ -423,6 +434,8 @@ class xGBT32960MonitorController():
 
     def login(self):
         self.model.sendMsg(self.model.create_msg_login())
+        time.sleep(0.1)
+        self.model.sendMsg(eval(msg_show_connected_vehicles))
 
     def bindVhl(self):
         VIN = self.view.VIN.get().strip().upper()
@@ -451,13 +464,29 @@ class xGBT32960MonitorController():
         if msg_name == 'gbdata':
             gbRaw = base64.standard_b64decode(msg['data'].encode('ascii'))
             self.showGBT32960Msg(gbRaw)
+                
         else:
             self.view.status.set(msg)
             if msg_name == 'internal_event':
                 event_name = msg['data']['event_name']
                 if event_name == TSP_DISCONNECTED:
                     self.updateConnectingStatusNotConnected()
-            
+
+            #handle ack msg from server
+            if msg_name == 'ack':
+                replyName =  msg['data']['name']
+                replyResult = msg['data']['reply']['result']
+                replyData = msg['data']['reply']['data']
+                self.handleAck(replyName, replyResult, replyData)
+
+    def handleAck(self, replyName, replyResult, replyData):
+        if replyName == 'show_connected_vehicles':
+            if replyResult == 'OK':
+                if len(replyData)>10: #至少有一辆车连接到服务器
+                    print(f'DEBUG: add entry to VINCombobox: {replyData}')
+                    self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory']+['-'*17]+replyData.split(','))           
+                else:   #当前没有车辆连接到服务器
+                    self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
 
     def updateConnectingStatusNotConnected(self):
         self.view.connectingActionStrVar.set('Connect')

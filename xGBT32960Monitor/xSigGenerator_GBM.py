@@ -16,15 +16,17 @@ from queue import Queue
 import base64
 
 # SERVER_IP = '127.0.0.1'
+# SERVER_PORT = 31029
+
+# SERVER_IP = '218.1.38.234'
+# SERVER_PORT = 1002
 
 SERVER_IP = '10.40.166.7'
 SERVER_PORT = 31029             # The same port as used by the server
 CFGFILE = 'xmonitor.cfg'
-# SERVER_IP = '10.40.166.8'
-# SERVER_PORT = 9201
 
-# SERVER_IP = '218.1.38.234'
-# SERVER_PORT = 1002
+
+
 
 TIMER_CLOSESOCKET_DELAY = 0.1
 #### BEGIN message template
@@ -34,7 +36,7 @@ msg_logout = "{'name': 'logout', 'data': '' }"
 msg_disconnect_vehicle = "{'name': 'disconnect_vehicle', 'data': '' }"
 msg_echo  = "{'name': 'echo', 'data': '' }"
 msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''} } }"
-
+msg_show_connected_vehicles = "{'name': 'show_connected_vehicles', 'data': '' }"
 ## internal msg
 msg_internal_event = "{'name': 'internal_event', 'data':{'event_name': '', 'event_data': ''} }"
 msg_warning = "{'name':'warning, 'data':{'warning_name': '', 'warning_data': ''} }"
@@ -272,9 +274,14 @@ class xGBT32960MonitorModel:
         if event_data:
             msg['data']['event_data'] = event_data
         return msg
-    def create_msg_warning(self,warning_name,warning_data):
-        msg = eval
-        
+
+    # def create_msg_warning(self,warning_name,warning_data):
+    #     msg = eval
+    
+    # def create_msg_show_connected_vehicles(self):
+    #     msg = eval(msg_show_connected_vehicles)
+    #     return msg
+
 def main(serverip=SERVER_IP,serverport=SERVER_PORT):
 
     msg_select_vehicle1 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G0000000SY1'} }"
@@ -313,6 +320,8 @@ def main(serverip=SERVER_IP,serverport=SERVER_PORT):
             gbm.sendMsg(eval(msg_disconnect_vehicle))
         elif cmd=='e':
             gbm.sendMsg(eval(msg_echo))
+        elif cmd=='show':
+            gbm.sendMsg(eval(msg_show_connected_vehicles))
         elif cmd=='n':
             gbm =xGBT32960MonitorModel()            
         else:

@@ -115,8 +115,7 @@ def parseGBTime (raw:bytes):
         hour = (x & maskHour) >>16
         minute = (x & maskMin) >>8
         sec = x & maskSec
-        return '%d-%02d-%02d %02d:%02d:%02d'%(year,month,date,hour,minute,sec)
-        
+        return '%d-%02d-%02d %02d:%02d:%02d'%(year,month,date,hour,minute,sec)    
 
 def parseAnalog(raw:bytes,ratio=1,offset=0,unit='',endian='big'):
     value = int.from_bytes(raw,endian)*ratio + offset
@@ -181,7 +180,13 @@ class Head(Field):
         def convert(header:bytes):
             cmd = Field('命令标识', header[2], convertfunc=lambda x: CMD[x])
             resflg = Field('应答标志', header[3])
-            VIN = Field('VIN', header[4:21],convertfunc=lambda x: x.decode('ascii'))
+            
+            try:
+                VIN = Field('VIN', header[4:21],convertfunc=lambda x: x.decode('ascii'))
+            except UnicodeDecodeError:
+                print(f'{timestamp}\tWARNING: 无法解析VIN码，使用全F代替')
+                VIN = Field('VIN', b'F'*17, convertfunc=lambda x: x.decode('ascii'))
+
             secretflg = Field('加密方式', header[21])
             length = Field('数据长度', header[22:24], convertfunc=lambda x: int(x.hex(),16))
             return [cmd,resflg,VIN,secretflg,length]
@@ -864,8 +869,8 @@ class OTAGBData(Field):
         def convert(msg:bytes):
             try:
                 head = Head(msg[:24])
-            except:
-                print('ERROR: can not analyze msg head, msg=',msg.hex())
+            except Exception as e:
+                print(f'{timestamp}\tERROR: can not analyze msg head, msg={msg.hex()}, exception {e}')
                 return None
             else:
                 chk = Field('校验字节',msg[-1])
