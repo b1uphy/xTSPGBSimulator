@@ -2,6 +2,7 @@
 # -*- coding: utf8 -*-
 # bluphy@163.com
 
+# 2019-04-03 12:30:00 by xw: v0.5.3 Add feature to support multi advisor cilent connect to a same vehicle.
 # 2019-04-03 12:30:00 by xw: v0.5.2 Add feature to reply connected vehicles to advisor client.
 # 2019-04-01 15:10:00 by xw: v0.5.1 Use f-string to print timestamp. 
 # 2018-12-03 15:26:33 by xw: v0.4.3 Fix some bug if the received VIN is not ASCII character
@@ -14,9 +15,10 @@
 # 2018-05-24 16:52:00 by xw: new created.
 
 # TODO: 
-# 
+# 1.多用户同时连接同一车辆
+# 2.车辆端log文件按照VIN及文件大小来切割
 
-str_version = 'v0.5.2'
+str_version = 'v0.5.3'
 
 #### BEGIN Calibration
 

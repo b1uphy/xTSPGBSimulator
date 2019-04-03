@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-03 12:30:00 by xw: Add feature to support multi advisor cilent connect to a same vehicle.
 # 2019-04-03 15:11:00 by xw: Fix bug when VIN is changed of the connected vehicle
 # 2019-04-03 12:30:00 by xw: Add feature to reply connected vehicles to advisor client.
 # 2018-12-06 15:47:43 by xw: delay some time after vehicle send logout msg
@@ -140,7 +141,7 @@ class Vehicle:
             print(f'{timestamp()}\tError CMD')
             result['code'] = 'Error CMD'
 
-        self.forward2Advisor(self.msg)
+        self.forward2Advisors(self.msg)
         self.writeLog()
 
         return result
@@ -201,17 +202,18 @@ class Vehicle:
     def createGBT32960Msg(self,msg):
         return json.dumps({'name':'gbdata','data':base64.standard_b64encode(msg).decode('ascii')}).encode('utf8')
 
-    def forward2Advisor(self,msg):
+    def forward2Advisors(self,msg):
        
         try:
-            self.advisor = gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor']            
+            self.advisors = gVIN_Vhl_Advisor_Mapping[self.VIN]['advisors']            
         except KeyError:
             pass            
         else:
-            if self.advisor:
-                self.advisor.putVhlMsg(self.createGBT32960Msg(msg))
-                if xDEBUG:
-                    print(f'{timestamp()}\tForward2Advisor') 
+            for advisor in self.advisors:
+                if advisor:
+                    advisor.putVhlMsg(self.createGBT32960Msg(msg))
+                    if xDEBUG:
+                        print(f'{timestamp()}\tForward2Advisor {advisor.username}') 
 
     async def receiveMsg(self)->bytes:
         result = {'msg':None, 'code':-1}
@@ -417,16 +419,21 @@ class Advisor:
             gVIN_Vhl_Advisor_Mapping[self.VIN] = {}
         finally:
             print(f'{timestamp()}\tBind advisor {self.username} to vehicle {self.VIN}')
-            gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor'] = self
+            try:
+                gVIN_Vhl_Advisor_Mapping[self.VIN]['advisors']
+            except KeyError:
+                gVIN_Vhl_Advisor_Mapping[self.VIN]['advisors'] = []
+            finally:
+                gVIN_Vhl_Advisor_Mapping[self.VIN]['advisors'].append(self)
 
     def unbindVhl(self):
         try:
-            gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor']
-        except KeyError:
+            gVIN_Vhl_Advisor_Mapping[self.VIN]['advisors'].remove(self)
+        except (KeyError, ValueError):
             print(f'{timestamp()}\tAdvisor {self.username} NOT bind with vehicle yet')
         else:
             print(f'{timestamp()}\tUnbind advisor {self.username} to vehicle {self.VIN}')  
-            gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor'] = None 
+            # gVIN_Vhl_Advisor_Mapping[self.VIN]['advisor'] = None 
             self.VIN = ''
 
     def login(self,msgobj):        
