@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-10 13:12:00 by xw: Optimize vehicle interface log, put logs in a same file for a same VIN
 # 2019-04-03 16:37:00 by xw: Fix a bug when reply advisor client a reply msg has a timestamp prefix by mistake
 # 2019-04-03 16:30:00 by xw: Add feature to support multi advisor cilent connect to a same vehicle.
 # 2019-04-03 15:11:00 by xw: Fix bug when VIN is changed of the connected vehicle
@@ -15,6 +16,8 @@ msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
 TIMER_OTA_MSG_TIMEOUT = 30
 TIMER_OTA_MSG_GOODBYE = 1
 LISTEMING_PORT = 9201
+
+SIZE_VEHICLE_LOG_MAX = 10 # unit is megabytes
 # END Calibration
 
 gInterrupt_flagstr = ''
@@ -22,7 +25,7 @@ gVIN_Vhl_Advisor_Mapping = {}
 
 xDEBUG = False
 
-import sys
+import sys,os
 # sys.path.append('D:\\bluphy\\nutcloud\\xProject\\LogParser')
 
 import time
@@ -80,70 +83,79 @@ class Vehicle:
             #处理响应消息
             result = self.processMsg(msg)        
             responseMsg = result['msg']
+            responseCode = result['code']
             if responseMsg:
                 await self.sendMsg(responseMsg)
-            if result['code'] == 'Close':
+            if responseCode == 'Close':
                 await asyncio.sleep(TIMER_OTA_MSG_GOODBYE)    
-                break        
-
+                break
+            elif responseCode == 'ErrorCMD':
+                pass
+            elif responseCode == 'InvalidMsgFormat':
+                pass
 
     def processMsg(self,msg)->bytes:
         result = {'msg':None, 'code':0}
         self.msg = msg
-        self.data = OTAGBData(msg)
-
-        if xDEBUG:
-            print(f'{timestamp()}\tRx vehicle msg:')
-            self.data.printself()
-
-        if self.VIN:
-            #当不是连接后的第一条消息时
-            if self.VIN != self.data.head.VIN.phy:
-                print(f'{timestamp()}\tWARNING: VIN is not match')
-                self.unregister() #老VIN取消注册
-                self.VIN = self.data.head.VIN.phy
-                self.logname = '{0}_{1}.csv'.format(self.VIN,time.strftime('%Y%m%d%H%M%S'))
-                self.register() #重新注册新的VIN
+        try:
+            self.data = OTAGBData(msg)
+        except IndexError as e:
+            result['code'] = 'InvalidMsgFormat'
+            try:
+                print(f"{timestamp()}\tWARNING: Invalid msg format ->{self.VIN}: {e} ")
+            except:
+                print(f"{timestamp()}\tWARNING: Invalid msg format ->VIN Unknown: {e} ")
+            self.writeLog(f"Invalid msg format {e}")
         else:
-            #TCP连接后的第一条消息
-            self.VIN = self.data.head.VIN.phy
-            self.logname = '{0}_{1}.csv'.format(self.VIN,time.strftime('%Y%m%d%H%M%S'))
-            self.register()
-        
-        if self.data.head.cmd.phy == '车辆登入':
-            self.state = 'Login'
-            print(f'{timestamp()}\tVehicle login: VIN = {self.VIN}')
-            result = self.responseLogin()
+            if xDEBUG:
+                print(f'{timestamp()}\tRx vehicle msg:')
+                self.data.printself()
 
-        elif self.data.head.cmd.phy == '实时数据' or self.data.head.cmd.phy == '补发数据':
-
-            #BDDemo
-            '''
-            chargingState_raw = self.data.payload[8]
-            if chargingState_raw==1:
-                chargingState = 1
+            if self.VIN:
+                #当不是连接后的第一条消息时
+                if self.VIN != self.data.head.VIN.phy:
+                    print(f'{timestamp()}\tWARNING: VIN is not match')
+                    self.unregister() #老VIN取消注册
+                    self.initVhl()
             else:
-                chargingState = 0
-            SOC =self.data.payload[5]
-            print('SOC=',SOC)
-            print('Vehicle {0} chargingState={1}'.format(self.VIN,chargingState))
-            with open('C:\\BDdemo\\demo.json','w') as fout:
-                fout.write(json.dumps({'chargingState':chargingState,'SOC':SOC}))
-            '''
-            pass
+                #TCP连接后的第一条消息
+                self.initVhl()
+            
+            if self.data.head.cmd.phy == '车辆登入':
+                self.state = 'Login'
+                print(f'{timestamp()}\tVehicle login: VIN = {self.VIN}')
+                result = self.responseLogin()
 
-        elif self.data.head.cmd.phy == '车辆登出':
-            print(f'{timestamp()}\tVehicle logout: VIN = {self.VIN}',)
-            result = self.responseLogout()
+            elif self.data.head.cmd.phy == '实时数据' or self.data.head.cmd.phy == '补发数据':
 
-        elif self.data.head.cmd.phy == '心跳':
-            result = self.responseHeartbeat()
-        else:
-            print(f'{timestamp()}\tError CMD')
-            result['code'] = 'Error CMD'
+                #BDDemo
+                '''
+                chargingState_raw = self.data.payload[8]
+                if chargingState_raw==1:
+                    chargingState = 1
+                else:
+                    chargingState = 0
+                SOC =self.data.payload[5]
+                print('SOC=',SOC)
+                print('Vehicle {0} chargingState={1}'.format(self.VIN,chargingState))
+                with open('C:\\BDdemo\\demo.json','w') as fout:
+                    fout.write(json.dumps({'chargingState':chargingState,'SOC':SOC}))
+                '''
+                pass
 
-        self.forward2Advisors(self.msg)
-        self.writeLog()
+            elif self.data.head.cmd.phy == '车辆登出':
+                print(f'{timestamp()}\tVehicle logout: VIN = {self.VIN}',)
+                result = self.responseLogout()
+
+            elif self.data.head.cmd.phy == '心跳':
+                result = self.responseHeartbeat()
+            else:
+                print(f'{timestamp()}\tError CMD')
+                result['code'] = 'ErrorCMD'
+
+            self.forward2Advisors(self.msg)
+
+            self.writeLog()
 
         return result
 
@@ -171,16 +183,26 @@ class Vehicle:
         self.writer.close()
         # self.log.close()
 
-    def writeLog(self):
+    def writeLog(self, extracontents=None):
         ##采集数据写入日志
         rxtime = time.strftime('%Y%m%d %H:%M:%S,')
         gbdatas = self.msg.hex()
 
         try:
-            with open('log\\'+self.logname,'a') as log:
+            with open(self.logpath,'a') as log:
                 log.write(rxtime+gbdatas+'\n')
+                if extracontents:
+                    log.write(rxtime+extracontents+'\n')
         except IOError:
             print(f'{timestamp()}\tWARNING: write log fail {rxtime} -> {gbdatas}')
+
+    def initVhl(self):
+        self.VIN = self.data.head.VIN.phy
+        self.logpath = f"log\\{self.VIN}.csv"
+        if os.path.exists(self.logpath):
+            if os.path.getsize(self.logpath)/(1024*1024)>SIZE_VEHICLE_LOG_MAX:
+                os.rename(self.logpath, f"{self.logpath.rsplit('.',1)[0]}_{time.strftime('%Y%m%d%H%M%S')}.csv")
+        self.register() #注册新的VIN
 
     def register(self):
         try:
@@ -319,7 +341,7 @@ class Advisor:
         if xDEBUG:
             print(f'{timestamp()}\tRun advisor rxloop')
         rxcounter = 0
-        while True:
+        while not self.reader.at_eof():
             try:
                 result = await self.receiveMsg()
             except OSError as e:
@@ -328,7 +350,15 @@ class Advisor:
             else:
                 print(f'{timestamp()}\tProcessing msg...')
                 if result['code'] == 0:
-                    self.processMsg(result['msg'])
+                    processresult = self.processMsg(result['msg'])
+                    if processresult ['code'] == 0:
+                        pass
+                    elif processresult['code'] == 'UnicodeError':
+                        pass
+                    elif processresult['code'] == 'AttributeError':
+                        pass
+                    else:
+                        pass
                 else:
                     print(f"{timestamp()}\tRx error msg in vehicle interface, code = {result['code']}")
             rxcounter +=1
@@ -348,6 +378,7 @@ class Advisor:
                 result = await self.sendMsg(msg)
             except OSError:
                 print(f'{timestamp()}\tFail to send Msg to advisor {self.username}: {msg.hex()}')
+                self.destroy() #失败后回收资源
                 break
             else:
                 print(f'{timestamp()}\tSend Msg to advisor {self.username}: {msg.hex()}')
@@ -374,9 +405,10 @@ class Advisor:
 
         if body:
             result['msg'] = body            
-           
             print(f"{timestamp()}\tReceived from advisor {self.client}:\t{result['msg'].decode('utf8')}") 
-
+        else:
+            result['code'] = 'BlankMsg'
+            print(f"{timestamp()}\tReceived blank msg from advisor {self.client}") 
         return result
 
     def reply(self,ack):
@@ -477,7 +509,11 @@ class Advisor:
         try:
             msgobj = json.loads(msg.decode('utf8'))
         except UnicodeError as e:
-            print( f"{timestamp()}\tWARNING: advisor msg format is not good,{e}")
+            print( f"{timestamp()}\tWARNING: advisor msg format is not good, {e}")
+            result['code'] = 'UnicodeError'
+        except AttributeError as e:
+            print( f"{timestamp()}\tWARNING: advisor msg is None, {e}")
+            result['code'] = 'AttributeError'
         else:
             if type(msgobj) == dict:
                 if msgobj['name'] == 'login':

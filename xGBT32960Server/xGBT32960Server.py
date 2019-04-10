@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-10 13:12:00 by xw: v0.5.4 Optimize vehicle interface log; Fix a bug when advisor client is not connected with server
 # 2019-04-03 16:37:00 by xw: v0.5.3.1 Fix a bug in xGBT32960ServerCore.py: When reply advisor client a reply msg has a timestamp prefix by mistake
 # 2019-04-03 16:30:00 by xw: v0.5.3 Add feature to support multi advisor cilent connect to a same vehicle.
 # 2019-04-03 12:30:00 by xw: v0.5.2 Add feature to reply connected vehicles to advisor client.
@@ -15,10 +16,10 @@
 # 2018-05-24 16:52:00 by xw: new created.
 
 # TODO: 
-# 1.多用户同时连接同一车辆
-# 2.车辆端log文件按照VIN及文件大小来切割
+# done 1.多用户同时连接同一车辆
+# done 2.车辆端log文件按照VIN及文件大小来切割
 
-str_version = 'v0.5.3.1'
+str_version = 'v0.5.4'
 
 #### BEGIN Calibration
 
@@ -40,8 +41,6 @@ LISTENING_ADVISOR_PORT = 31029
 #### END Calibration
 
 # BEGIN debug
-
-
 # END debug 
 
 # BEGIN xTSPSimulator_TOP
@@ -67,7 +66,6 @@ async def handle_vehicle_connection(reader, writer):
     print(f'{timestamp()}\tClose the connection with vehicle VIN={vhl.VIN}')
     vhl.destroy()
     vhl = None
-
 
 async def handle_advisor_connection(reader:asyncio.StreamReader, writer:asyncio.StreamWriter):
     advisor = Advisor(reader,writer)
