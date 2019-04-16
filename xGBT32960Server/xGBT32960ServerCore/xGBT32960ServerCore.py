@@ -70,7 +70,7 @@ class Vehicle:
     async def startloop(self):
         counter = 0
         while True:  # <4>
-            asyncio.sleep(0.1) #加入短暂延时以便其他携程有机会获取CPU时间
+            await asyncio.sleep(0.1) #加入短暂延时以便其他携程有机会获取CPU时间
             counter += 1
             print('counter=',counter)
             print(self.client,f'{timestamp()}\tWaiting msg...')
@@ -374,7 +374,7 @@ class Advisor:
             print(f'{timestamp()}\tRun advisor {self.username} txloop')
         txcounter = 0
         while True:
-            asyncio.sleep(0.1) #加入短暂延时以便其他携程有机会获取CPU时间
+            await asyncio.sleep(0.1) #加入短暂延时以便其他携程有机会获取CPU时间
             msg = await self.outputQueue.get()
             
             try:
