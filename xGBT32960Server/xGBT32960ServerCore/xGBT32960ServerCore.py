@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-16 13:58:00 by xw: Add breath time between coro loop, make advisor client response more quickly
 # 2019-04-10 13:12:00 by xw: Optimize vehicle interface log, put logs in a same file for a same VIN
 # 2019-04-03 16:37:00 by xw: Fix a bug when reply advisor client a reply msg has a timestamp prefix by mistake
 # 2019-04-03 16:30:00 by xw: Add feature to support multi advisor cilent connect to a same vehicle.
@@ -69,6 +70,7 @@ class Vehicle:
     async def startloop(self):
         counter = 0
         while True:  # <4>
+            asyncio.sleep(0.1) #加入短暂延时以便其他携程有机会获取CPU时间
             counter += 1
             print('counter=',counter)
             print(self.client,f'{timestamp()}\tWaiting msg...')
@@ -372,6 +374,7 @@ class Advisor:
             print(f'{timestamp()}\tRun advisor {self.username} txloop')
         txcounter = 0
         while True:
+            asyncio.sleep(0.1) #加入短暂延时以便其他携程有机会获取CPU时间
             msg = await self.outputQueue.get()
             
             try:
