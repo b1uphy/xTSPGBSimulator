@@ -41,14 +41,12 @@ msg_show_connected_vehicles = "{'name': 'show_connected_vehicles', 'data': '' }"
 msg_internal_event = "{'name': 'internal_event', 'data':{'event_name': '', 'event_data': ''} }"
 msg_warning = "{'name':'warning, 'data':{'warning_name': '', 'warning_data': ''} }"
 msg_error = "{'name':'error, 'data':{'error_name': '', 'error_data': ''} }"
+#### END## message template
+
 ## event names
 xEventNames = {'TSP_DISCONNECTED'}
 
 TSP_DISCONNECTED = 'TSP_DISCONNECTED'
-
-#### END## message template
-
-
 
 
 xDEBUG = False

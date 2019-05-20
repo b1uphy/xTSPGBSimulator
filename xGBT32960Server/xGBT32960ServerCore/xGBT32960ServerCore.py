@@ -16,7 +16,6 @@ msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''}}}"
 # BEGIN Calibration
 TIMER_OTA_MSG_TIMEOUT = 30
 TIMER_OTA_MSG_GOODBYE = 1
-LISTEMING_PORT = 9201
 
 SIZE_VEHICLE_LOG_MAX = 10 # unit is megabytes
 # END Calibration
@@ -247,11 +246,10 @@ class Vehicle:
             # rxtime = time.strftime('%Y%m%d %H:%M:%S')
             async with timeout(TIMER_OTA_MSG_TIMEOUT):
                 header = await self.reader.readexactly(24)
-                
         except asyncio.TimeoutError:
             print(f'{timestamp()}\tRx timeout')
-            print(f'{timestamp()}\tClose connection with vehicle because of timeout')
-            result['code'] = 'Timeout!'
+            print(f'{timestamp()}\tClose connection with vehicle because of header timeout')
+            result['code'] = 'TimeoutHeader'
             self.unregister()    
         except OSError:
             print(f'{timestamp()}\tConnection with vehicle VIN: {self.VIN} broken!')
@@ -273,8 +271,8 @@ class Vehicle:
                         data = await self.reader.readexactly(length)
                 except asyncio.TimeoutError:                   
                     print(f'{timestamp()}\tRx timeout')
-                    print(f'{timestamp()}\tClose connection because of timeout')
-                    result['code'] = 'Timeout!'
+                    print(f'{timestamp()}\tClose connection because of body timeout')
+                    result['code'] = 'TimeoutBody'
                     self.unregister()
                 except asyncio.IncompleteReadError as err:
                     print(f'{timestamp()}\tWARNING: wrong msg format {err}')

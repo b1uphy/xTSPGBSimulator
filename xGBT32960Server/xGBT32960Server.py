@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-04-16 13:58:00 by xw: v0.5.4.2 Distinguish the timeout log output for rx msg from vehicle of rx header and rx body
 # 2019-04-16 13:58:00 by xw: v0.5.4.1 Add breath time between coro loop, make advisor client response more quickly
 # 2019-04-10 13:12:00 by xw: v0.5.4 Optimize vehicle interface log; Fix a bug when advisor client is not connected with server
 # 2019-04-03 16:37:00 by xw: v0.5.3.1 Fix a bug in xGBT32960ServerCore.py: When reply advisor client a reply msg has a timestamp prefix by mistake
@@ -20,7 +21,7 @@
 # done 1.多用户同时连接同一车辆
 # done 2.车辆端log文件按照VIN及文件大小来切割
 
-str_version = 'v0.5.4.1'
+str_version = 'v0.5.4.2'
 
 #### BEGIN Calibration
 
@@ -36,7 +37,7 @@ DBNAME = 'borgward_db'
 DBUSERNAME = 'borgward'
 DBPASSWORD = '123456'
 
-TIMER_OTA_MSG_TIMEOUT = 30
+# TIMER_OTA_MSG_TIMEOUT = 30
 LISTENING_VHL_PORT = 9201
 LISTENING_ADVISOR_PORT = 31029
 #### END Calibration
