@@ -219,9 +219,9 @@ class Vehicle:
             gVIN_Vhl_Advisor_Mapping[self.VIN]['vhl'] = None
             
         except KeyError:
-            print(f"VIN: {self.VIN} is not registered")
+            print(f"{timestamp()}\tVIN: {self.VIN} is not registered")
         else:
-            print(f"VIN: {self.VIN} is unregistered")
+            print(f"{timestamp()}\tVIN: {self.VIN} is unregistered")
 
     def createGBT32960Msg(self,msg):
         return json.dumps({'name':'gbdata','data':base64.standard_b64encode(msg).decode('ascii')}).encode('utf8')
