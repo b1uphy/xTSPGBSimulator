@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-06-04 18:41:16 by xw: Fix bug for system blocked when can not write to log because of log file is opened by another application like excel
 # 2019-04-16 13:58:00 by xw: Add breath time between coro loop, make advisor client response more quickly
 # 2019-04-10 13:12:00 by xw: Optimize vehicle interface log, put logs in a same file for a same VIN
 # 2019-04-03 16:37:00 by xw: Fix a bug when reply advisor client a reply msg has a timestamp prefix by mistake
@@ -194,7 +195,7 @@ class Vehicle:
                 log.write(rxtime+gbdatas+'\n')
                 if extracontents:
                     log.write(rxtime+extracontents+'\n')
-        except IOError:
+        except IOError or PermissionError:
             print(f'{timestamp()}\tWARNING: write log fail {rxtime} -> {gbdatas}')
 
     def initVhl(self):
