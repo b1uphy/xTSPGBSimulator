@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2019-05-22 13:40:34 by xw: v0.5.4.3 Default server host set as 0.0.0.0
 # 2019-04-16 13:58:00 by xw: v0.5.4.2 Distinguish the timeout log output for rx msg from vehicle of rx header and rx body
 # 2019-04-16 13:58:00 by xw: v0.5.4.1 Add breath time between coro loop, make advisor client response more quickly
 # 2019-04-10 13:12:00 by xw: v0.5.4 Optimize vehicle interface log; Fix a bug when advisor client is not connected with server
@@ -21,7 +22,7 @@
 # done 1.多用户同时连接同一车辆
 # done 2.车辆端log文件按照VIN及文件大小来切割
 
-str_version = 'v0.5.4.2'
+str_version = 'v0.5.4.3'
 
 #### BEGIN Calibration
 
@@ -83,11 +84,7 @@ def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHo
     if args.address:
         address = args.address
     else:
-        try:
-            address = socket.gethostbyname(socket.gethostname())
-        except:
-            print(f'{timestamp()}\tUse default address 127.0.0.1')
-            address = '127.0.0.1'
+        address = '0.0.0.0'
 
     if args.vhlport:   
         port2vhl = args.vhlport
@@ -126,7 +123,8 @@ def main(args, dbName=DBNAME, dbUserName=DBUSERNAME, dbPassword=DBPASSWORD, dbHo
     print('Server shut down.')
 
 if __name__ == '__main__':
-    print(f'Welcome to use xTSPGBServer version {str_version}')
+    print(f'Welcome to use xTSPGBServer version {str_version}, server IP: {socket.gethostbyname(socket.gethostname())}')
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--address", help='serving IP address', type=str)
     parser.add_argument("--vhlport", type=int, help="the tcp port number for vehicle connection", default=9201)
