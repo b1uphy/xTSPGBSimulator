@@ -23,7 +23,7 @@
 # done 1.多用户同时连接同一车辆
 # done 2.车辆端log文件按照VIN及文件大小来切割
 
-str_version = 'v0.5.4.4'
+str_version = 'v0.5.4.5'
 
 #### BEGIN Calibration
 
