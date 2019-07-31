@@ -219,11 +219,11 @@ class Vehicle:
         try:
             self.writer.write(msg)
         except OSError:
-            self.writeLog(f'tx to VIN={self.VIN} fail -> msg={msg.hex()}')
+            self.writeLog(f'tx to   VIN={self.VIN} fail -> msg={msg.hex()}')
         else:
             systime = time.time()
             writedb(msg, systime, 1, self.db)
-            self.writeLog(f'tx to VIN={self.VIN} msg={msg.hex()}')
+            self.writeLog(f'tx to   VIN={self.VIN} msg={msg.hex()}')
 
     def responseLogin(self):
         result = {'msg':None, 'code':0}
