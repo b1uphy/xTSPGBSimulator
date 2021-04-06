@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2021-04-06 23:22:46 by xw: v0.6.2 update some print contents; add support to GBData 0x04 engine data
 # 2019-04-03 15:34:00 by xw: v0.6.1 using new xOYAGBT32960.py to update version number as v0.6.1
 # 2019-04-03 14:12:00 by xw: v0.6.0 VIN combobox dropdown will show the connected vehicles list
 # 2018-12-13 15:41:08 by xw: v0.5.9.5 add collect time in the prefix of each log line
@@ -41,7 +42,7 @@
 # 15.显示已连接到服务器车辆列表
 xDEBUG = False
 
-str_Version = 'v0.6.1'
+str_Version = 'v0.6.2'
 str_Title = 'GB大数据监视器'
 
 import sys,os,ctypes,socket,time
@@ -354,7 +355,7 @@ class xGBT32960MonitorController():
         self.view.hostCombobox.configure(values=self.model.configsHistory['hostHistory'])
 
     def updateVINDropDown(self):
-        print('DDEBUG: update VINDropDown')
+        print('DEBUG: update VINDropDown')
         self.model.sendMsg(eval(msg_show_connected_vehicles))
         # self.view.VINCombobox.configure(values=self.model.configsHistory['vhlHistory'])
 
@@ -628,7 +629,8 @@ class xGBT32960MonitorController():
     def rxloop(self):
         while (not self.closeflag) and self.rxthdExist:
             self.model.rxMsg()
-            try:           
+            # self.processMsg()  # this function will block until get a msg from server
+            try:
                 self.processMsg() #this function will block until get a msg from server
             except Exception as e:
                 print(e)

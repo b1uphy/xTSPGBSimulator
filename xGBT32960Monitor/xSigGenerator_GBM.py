@@ -1,6 +1,7 @@
 #Echo client program
 #made by bluphy
 #contact @163.com
+# 2021-04-06 23:17:23 by xw: v0.5.2 add debug mode, user can send any msg
 # 2018-11-14 16:38:25 by xw: v0.5.1 fix a bug when change the network, the login username is not changed to the new socket
 # 2018-11-12 14:35:43 by xw: v0.5 Support config file and vehicle history record
 # 2018-10-31 18:24:07 by xw: v0.4 Fix bug txloop does not stopped when model destroied
@@ -213,15 +214,16 @@ class xGBT32960MonitorModel:
                 try:
                     msg = json.loads(body_tail[:-1].decode('utf8'))
                 except:
-                    print('WARNING: received an invalid msg')
+                    print(f'WARNING: received an invalid msg={body_tail[:-1].hex()}')
 
-                self.rxq.put(msg)
-                name = msg['name']
-                data = msg['data']
-                if name != 'gbdata':
-                    print(msg,'\n?>',end='')
                 else:
-                    print('Received a GB/T 32960 msg','\n?>',end='')
+                    self.rxq.put(msg)
+                    name = msg['name']
+                    data = msg['data']
+                    if name != 'gbdata':
+                        print(msg,'\n?>',end='')
+                    else:
+                        print('Received a GB/T 32960 msg','\n?>',end='')
                 # print(gbdata_hndl(data),'\n?>',end='')
         
         # print('rx stopped','\n?>',end='')
