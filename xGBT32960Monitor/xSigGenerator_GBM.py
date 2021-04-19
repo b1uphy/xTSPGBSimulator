@@ -1,6 +1,6 @@
 #Echo client program
 #made by bluphy
-#contact @163.com
+#contact bluphy@163.com
 # 2021-04-06 23:17:23 by xw: v0.5.2 add debug mode, user can send any msg
 # 2018-11-14 16:38:25 by xw: v0.5.1 fix a bug when change the network, the login username is not changed to the new socket
 # 2018-11-12 14:35:43 by xw: v0.5 Support config file and vehicle history record
@@ -8,21 +8,22 @@
 # 2018-10-31 15:07:15 by xw: v0.3 supply to get reply msg from server
 # 2018-09-25 16:34:13 by xw: 
 
-str_version = 'v0.5.1'
+str_version = 'v0.5.2'
 import logging
-import socket,time,sys,json
+import socket, time, sys, json
 from threading import Thread
 from queue import Queue
 
 import base64
 
-# SERVER_IP = '127.0.0.1'
+# SERVER_IP = '127.0.0.1'       # local pc
 # SERVER_PORT = 31029
 
 # SERVER_IP = '218.1.38.234'
 # SERVER_PORT = 1002
 
-SERVER_IP = '10.40.166.7'
+# SERVER_IP = '10.40.166.7'
+SERVER_IP = '101.133.160.216'   # alicloud
 SERVER_PORT = 31029             # The same port as used by the server
 CFGFILE = 'xmonitor.cfg'
 
@@ -31,13 +32,13 @@ CFGFILE = 'xmonitor.cfg'
 
 TIMER_CLOSESOCKET_DELAY = 0.1
 #### BEGIN message template
-msg_login = "{'name': 'login', 'data': {'username': ''} }"
-msg_select_vehicle = "{'name': 'select_vehicle', 'data': {'VIN': ''} }"
-msg_logout = "{'name': 'logout', 'data': '' }"
-msg_disconnect_vehicle = "{'name': 'disconnect_vehicle', 'data': '' }"
-msg_echo  = "{'name': 'echo', 'data': '' }"
-msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''} } }"
-msg_show_connected_vehicles = "{'name': 'show_connected_vehicles', 'data': '' }"
+msg_login = "{'name': 'login', 'data': {'username': ''} }"                                          #登入服务器
+msg_select_vehicle = "{'name': 'select_vehicle', 'data': {'VIN': ''} }"                             #选择车辆
+msg_logout = "{'name': 'logout', 'data': '' }"                                                      #登出服务器
+msg_disconnect_vehicle = "{'name': 'disconnect_vehicle', 'data': '' }"                              #断开监视器与车辆的绑定关系
+msg_echo = "{'name': 'echo', 'data': '' }"                                                         #回显监视器客户端的信息
+msg_ack = "{'name':'ack','data':{'name':'','reply':{'result':'','data':''} } }"                     #服务器回复
+msg_show_connected_vehicles = "{'name': 'show_connected_vehicles', 'data': '' }"                    #查询已经连接到服务器的车辆
 ## internal msg
 msg_internal_event = "{'name': 'internal_event', 'data':{'event_name': '', 'event_data': ''} }"
 msg_warning = "{'name':'warning, 'data':{'warning_name': '', 'warning_data': ''} }"
@@ -266,7 +267,7 @@ class xGBT32960MonitorModel:
 
     def create_msg_common(self,msg_template,*data):
         msg = eval(msg_template)
-        msg['data']
+        msg['data'] = data
 
     def create_msg_internal_event(self, event_name, event_data = None):
         msg = eval(msg_internal_event)
@@ -282,11 +283,12 @@ class xGBT32960MonitorModel:
     #     msg = eval(msg_show_connected_vehicles)
     #     return msg
 
-def main(serverip=SERVER_IP,serverport=SERVER_PORT):
 
-    msg_select_vehicle1 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G0000000SY1'} }"
-    msg_select_vehicle2 = "{'name': 'select_vehicle', 'data': {'VIN': 'LXVJ2GFC2GA030003'} }"
-    msg_select_vehicle3 = "{'name': 'select_vehicle', 'data': {'VIN': 'LMGFE1G88D1022SY5'} }"
+def main(serverip=SERVER_IP, serverport=SERVER_PORT):
+
+    msg_select_vehicle1 = "{'name': 'select_vehicle', 'data': {'VIN': '11122233344455566'} }"
+    msg_select_vehicle2 = "{'name': 'select_vehicle', 'data': {'VIN': '11122233344455577'} }"
+    msg_select_vehicle3 = "{'name': 'select_vehicle', 'data': {'VIN': '11122233344455588'} }"
 
     gbm =xGBT32960MonitorModel()
 
@@ -326,6 +328,7 @@ def main(serverip=SERVER_IP,serverport=SERVER_PORT):
             gbm =xGBT32960MonitorModel()            
         else:
             help()
+
 
 if __name__ == '__main__':
 
