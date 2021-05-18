@@ -23,7 +23,7 @@
 # done 1.多用户同时连接同一车辆
 # done 2.车辆端log文件按照VIN及文件大小来切割
 
-str_version = 'v0.5.4.4'
+str_version = 'v0.5.4.5'
 
 #### BEGIN Calibration
 
@@ -67,14 +67,14 @@ async def handle_vehicle_connection(reader, writer):
     global gDBhdl
     vhl = Vehicle(reader,writer,gDBhdl)
     await vhl.startloop()
-    print(f'{timestamp()}\tClose the connection with vehicle VIN={vhl.VIN}')
+    print(f'{timestamp()} [TSP]:  Close the connection with vehicle VIN={vhl.VIN}')
     vhl.destroy()
     vhl = None
 
 async def handle_advisor_connection(reader:asyncio.StreamReader, writer:asyncio.StreamWriter):
     advisor = Advisor(reader,writer)
     await advisor.startloop()
-    print(f'{timestamp()}\tClose the connection with advisor:{advisor.username}')
+    print(f'{timestamp()} [ADV]:  Close the connection with advisor:{advisor.username}')
     advisor.destroy()
     advisor = None
     
