@@ -10,4 +10,6 @@
 log
 build
 dist
+/.idea/
 __pycache__
+/xGBT32960Monitor/xTGWSimulator.py
