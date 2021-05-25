@@ -7,10 +7,18 @@
 
 import psycopg2,time
 
+
+
+def connectdb_fake(dbname,dbusername,dbpassword,dbhost='127.0.0.1',dbport=5432):
+    pass
+
+
 def connectdb(dbname,dbusername,dbpassword,dbhost='127.0.0.1',dbport=5432):
     conn = psycopg2.connect('dbname={dbname} user={dbusername} password={dbpassword} host={dbhost} port={dbport}'.format_map(vars()))
     cur = conn.cursor()
     return {'connection':conn,'cursor':cur}
+
+
 def parseGBPkgs_bytes(raw:bytes):
     # raw = raw.strip()
     dct = {}
@@ -30,8 +38,15 @@ def parseGBPkgs_bytes(raw:bytes):
     dct['check'] = raw[-1:]
     return dct
 
+
 def checkmsg(raw:bytes):
     return 0
+
+
+
+def writedb_fake(raw:bytes, systime, direction, dbhdl):
+    pass
+
 
 def writedb(raw:bytes, systime, direction, dbhdl):
     '''
