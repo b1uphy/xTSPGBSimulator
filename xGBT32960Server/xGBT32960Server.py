@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 # bluphy@163.com
+# 2021-05-26 00:31:00 by xw: v0.5.4.6 disable writing to db in master branch
 # 2019-06-04 18:43:01 by xw: v0.5.4.4 Fix bug for system blocked when can not write to log because of log file is opened by another application like excel
 # 2019-05-22 13:40:34 by xw: v0.5.4.3 Default server host set as 0.0.0.0
 # 2019-04-16 13:58:00 by xw: v0.5.4.2 Distinguish the timeout log output for rx msg from vehicle of rx header and rx body
@@ -23,7 +24,7 @@
 # done 1.多用户同时连接同一车辆
 # done 2.车辆端log文件按照VIN及文件大小来切割
 
-str_version = 'v0.5.4.5'
+str_version = 'v0.5.4.6'
 
 #### BEGIN Calibration
 
@@ -57,7 +58,8 @@ import json
 import socket
 from async_timeout import timeout
 
-from xGBT32960ServerCore.xDBService import connectdb
+#from xGBT32960ServerCore.xDBService import connectdb
+from xGBT32960ServerCore.xDBService import connectdb_fake as connectdb
 from xGBT32960ServerCore.xOTAGBT32960 import timestamp
 from xGBT32960ServerCore.xGBT32960ServerCore import Vehicle, Advisor
 
