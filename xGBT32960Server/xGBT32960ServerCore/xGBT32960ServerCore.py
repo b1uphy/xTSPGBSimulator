@@ -39,7 +39,9 @@ from async_timeout import timeout
 
 import base64
 
-from .xDBService import writedb
+#from .xDBService import writedb
+from .xDBService import writedb_fake as writedb
+
 from .xOTAGBT32960 import OTAGBData,createOTAGBMsg,CMD,genGBTime,timestamp
 
 def getConnectedVehicles():
